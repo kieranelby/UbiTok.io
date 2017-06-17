@@ -1,13 +1,56 @@
-exports.encodeDirection = function (direction) {
-  if (direction == "Invalid") {
-    return 0;
-  } else if (direction == "Buy") {
-    return 1;
-  } else if (direction == "Sell") {
-    return 2;
-  } else {
-    throw new Error("unknown direction " + direction)
+var enumTradableType = [
+  'Ether',
+  'ERC20'
+];
+
+var enumDirection = [
+  'Invalid',
+  'Buy',
+  'Sell'
+];
+
+var enumStatus = [
+  'Unknown',
+  'Rejected',
+  'Open',
+  'Done'
+];
+
+var enumCancelOrRejectReason = [
+  'None',
+  'InvalidPrice',
+  'InvalidSize',
+  'InsufficientFunds',
+  'WouldTake',
+  'WouldEnter',
+  'TooManyMatches',
+  'ClientCancel'
+];
+
+var enumTerms = [
+  'GoodTillCancel',
+  'ImmediateOrCancel',
+  'MakerOnly'
+];
+
+function encodeEnum(enumNamedValues, namedValue) {
+  var idx = enumNamedValues.indexOf(namedValue);
+  if (idx == -1) {
+    throw new Error("unknown name " + namedValue + " expected one of " + enumNamedValues);
   }
+  return idx;
+};
+
+function decodeEnum(enumNamedValues, encodedValue) {
+  if (encodedValue.valueOf) encodedValue = encodedValue.valueOf();
+  if (encodedValue >= enumNamedValues.length) {
+    throw new Error("unknown encodedValue " + encodedValue + " expected one of " + enumNamedValues);
+  }
+  return enumNamedValues[encodedValue];
+};
+
+exports.encodeDirection = function (directionName) {
+  return encodeEnum(enumDirection, directionName);
 };
 
 exports.oppositeEncodedDirection = function(encodedDirection) {
@@ -22,50 +65,16 @@ exports.oppositeEncodedDirection = function(encodedDirection) {
   }
 };
 
-exports.encodeTerms = function (terms) {
-  if (terms == "GoodTillCancel") {
-    return 0;
-  } else if (terms == "ImmediateOrCancel") {
-    return 1;
-  } else if (terms == "MakerOnly") {
-    return 2;
-  } else {
-    throw new Error("unknown terms " + terms)
-  }
+exports.encodeTerms = function (termsName) {
+  return encodeEnum(enumTerms, termsName);
 };
 
-exports.decodeStatus = function (status) {
-  if (status.valueOf) status = status.valueOf();
-  if (status == 0) {
-    return 'Unknown';
-  } else if (status == 1) {
-    return 'Pending';
-  } else if (status == 2) {
-    return 'Rejected';
-  } else if (status == 3) {
-    return 'Open';
-  } else if (status == 4) {
-    return 'Done';
-  } else {
-    throw new Error("unknown status " + status)
-  }
+exports.decodeStatus = function (encodedStatus) {
+  return decodeEnum(enumStatus, encodedStatus);
 };
 
-exports.decodeRejectReason = function (rejectReason) {
-  if (rejectReason.valueOf) rejectReason = rejectReason.valueOf();
-  if (rejectReason == 0) {
-    return 'None';
-  } else if (rejectReason == 1) {
-    return 'InvalidPrice';
-  } else if (rejectReason == 2) {
-    return 'InvalidSize';
-  } else if (rejectReason == 3) {
-    return 'InsufficientFunds';
-  } else if (rejectReason == 4) {
-    return 'WouldTake';
-  } else {
-    throw new Error("unknown rejectReason " + rejectReason)
-  }
+exports.decodeRejectReason = function (encodedRejectReason) {
+  return decodeEnum(enumCancelOrRejectReason, encodedRejectReason);
 };
 
 exports.decodeState = function (state) {
