@@ -301,9 +301,9 @@ contract UbiTokExchange {
 
     if (order.executedBase > ourOriginalExecutedBase) {
       if (isBuyPrice(order.pricePacked)) {
-        balanceQuotedForClient[order.client] += order.executedQuoted - ourOriginalExecutedQuoted;
-      } else {
         balanceBaseForClient[order.client] += order.executedBase - ourOriginalExecutedBase;
+      } else {
+        balanceQuotedForClient[order.client] += order.executedQuoted - ourOriginalExecutedQuoted;
       }
     }
 

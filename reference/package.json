@@ -1,0 +1,16 @@
+{
+  "name": "reference-exchange",
+  "version": "1.0.0",
+  "description": "",
+  "main": "reference-exchange.js",
+  "scripts": {
+    "test": "./node_modules/.bin/mocha --reporter spec"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bignumber.js": "^4.0.2",
+    "chai": "^4.0.2",
+    "mocha": "^3.4.2"
+  }
+}
