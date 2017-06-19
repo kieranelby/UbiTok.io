@@ -1,4 +1,6 @@
-## Limit Orders
+## Creating Orders
+
+### Limit Orders
 
 To ensure you get a fair price, UbiTok.io uses Limit Orders.
 
@@ -8,7 +10,7 @@ The size of the order is always specified in the base currency (whether buying o
 
 Most limit orders can be partially filled - this can happen if, say, you enter an order to buy 10,000 UBI but only 4,000 UBI are available at the price you want.
 
-## Order Terms
+### Order Terms
 
 UbiTok.io supports the following Order Terms for your orders, which let you control what happens when your order can or cannot be filled:
 
@@ -16,7 +18,7 @@ UbiTok.io supports the following Order Terms for your orders, which let you cont
 - Immediate or Cancel - Your order will be matched against existing orders. If it cannot be completely filled, the remaining unmatched portion will be cancelled. The order will never be added to the book. Popular for quick, small trades.
 - Maker Only - Your order will be rejected immediately (without matching) if any part of it would be filled. Otherwise, it will be added to the book and remain valid until you cancel it. Popular with market makers. Also known as Post Only.
 
-## Gas Costs
+### Gas Costs
 
 UbiTok.io performs all matching using a smart contract running on the Ethereum blockchain. This is good - it means you don't need to worry about our servers failing, being shutdown or being hacked.
 
@@ -32,7 +34,7 @@ For Maker Only orders, the limit doesn't apply - they're always rejected if they
 
 For Good 'Til Cancelled orders, you can choose what to do if the maximum number of matches is reached.
 
-## Gas Top Up
+### Gas Top Up
 
 If Allow Gas Top-Up is disabled (the default), and there are so many matching orders in the book that matching your Good 'Til Cancelled order against them all is too expensive to do in one go, the unmatched portion of the order will be cancelled after matching as many as possible. The order will not be added to the book if this happens.
 
