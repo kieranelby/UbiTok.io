@@ -174,8 +174,8 @@ contract('UbiTokExchange', function(accounts) {
     [ 1002, packedBuyOnePointZero, web3.toWei(100, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), "not enough funds", "InsufficientFunds" ],
     [ 1003, packedBuyOnePointZero, new web3.BigNumber("1e39"), UbiTokTypes.encodeTerms('GoodTillCancel'), "proposterously large base size", "InvalidSize" ],
     [ 1004, packedMaxBuyPrice, new web3.BigNumber("1e32"), UbiTokTypes.encodeTerms('GoodTillCancel'), "proposterously large quoted size (but base ok)", "InvalidSize" ],
-    [ 1005, packedBuyOnePointZero, web3.toWei(9, 'szabo'), UbiTokTypes.encodeTerms('GoodTillCancel'), "small base size", "InvalidSize" ],
-    [ 1006, packedBuyOnePointZero, web3.toWei(100, 'szabo'), UbiTokTypes.encodeTerms('GoodTillCancel'), "small quoted size (but base ok)", "InvalidSize" ],
+    [ 1005, packedBuyOnePointZero, 90, UbiTokTypes.encodeTerms('GoodTillCancel'), "small base size", "InvalidSize" ],
+    [ 1006, packedBuyOnePointZero, 900, UbiTokTypes.encodeTerms('GoodTillCancel'), "small quoted size (but base ok)", "InvalidSize" ],
   ];
   var balanceQuotedAfterDeposit;
   it("first accepts a deposit to be used to place bad orders", function() {
@@ -206,6 +206,362 @@ contract('UbiTokExchange', function(accounts) {
         assert.equal(balanceQuotedAfterOrderRejected.toString(), balanceQuotedAfterDeposit.toString());
       });
     });
+  });
+});
+
+
+function buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges) {
+  var clients = new Set();
+  for (var cmd of commands) {
+    clients.add(cmd[2]);
+  }
+  for (var expectedBalanceChange of expectedBalanceChanges) {
+    clients.add(expectedBalanceChange[0]);
+  }
+  var standardInitialBalanceBase   = 1000000000;
+  var standardInitialBalanceQuoted =  100000000;
+  var accountIdForClient = {};
+  var nextAccountId = 0;
+  for (var client of clients) {
+    accountIdForClient[client] = nextAccountId;
+    nextAccountId++;
+    console.log("client " + client + " has account #" + accountIdForClient[client]);
+    chain = chain.then((function (ctx, a, ab) {
+      return function (lastResult) {
+        console.log("depositing into " + ctx.accounts[a]);
+        return ctx.uut.depositBaseForTesting(ctx.accounts[a], ab, {from: ctx.accounts[a]});
+      };
+    }(context, accountIdForClient[client], standardInitialBalanceBase)));
+    chain = chain.then((function (ctx, a, aq) {
+      return function (lastResult) {
+        return ctx.uut.depositQuotedForTesting(ctx.accounts[a], aq, {from: ctx.accounts[a]});
+      };
+    }(context, accountIdForClient[client], standardInitialBalanceQuoted)));
+  }
+  for (var cmd of commands) {
+    chain = chain.then((function (ctx, a, c) {
+      return function (lastResult) {
+        return ctx.uut.createOrder(
+          c[3],
+          UbiTokTypes.encodePrice(c[4]),
+          c[5],
+          UbiTokTypes.encodeTerms(c[6]),
+          {from: ctx.accounts[a]}
+        );
+      };
+    }(context, accountIdForClient[cmd[2]], cmd)));
+  }
+  for (var expectedOrder of expectedOrders) {
+    chain = chain.then((function (ctx, eo) {
+      return function (lastResult) {
+        return ctx.uut.getOrderState.call(eo[0]);
+      };
+    }(context, expectedOrder)));
+    chain = chain.then((function (ctx, eo) {
+      return function (lastResult) {
+        var state = UbiTokTypes.decodeState(lastResult);
+        assert.equal(state.status, eo[1], "order " + eo[0]);
+        assert.equal(state.rejectReason, eo[2], "order " + eo[0]);
+        assert.equal(state.executedBase, eo[3], "order " + eo[0]);
+        assert.equal(state.executedQuoted, eo[4], "order " + eo[0]);
+      };
+    }(context, expectedOrder)));
+  }
+  for (var expectedBalanceChange of expectedBalanceChanges) {
+    var client = expectedBalanceChange[0];
+    chain = chain.then((function (ctx, a, ebc) {
+      return function (lastResult) {
+        console.log("getting balance of " + ctx.accounts[a]);
+        return ctx.uut.balanceBaseForClient.call(ctx.accounts[a]);
+      };
+    }(context, accountIdForClient[client], expectedBalanceChange)));
+    chain = chain.then((function (ctx, a, ebc) {
+      return function (lastResult) {
+        assert.equal(lastResult.toNumber() - standardInitialBalanceBase, ebc[1], "base balance change for " + ebc[0]);
+      };
+    }(context, accountIdForClient[client], expectedBalanceChange)));
+    chain = chain.then((function (ctx, a, ebc) {
+      return function (lastResult) {
+        return ctx.uut.balanceQuotedForClient.call(ctx.accounts[a]);
+      };
+    }(context, accountIdForClient[client], expectedBalanceChange)));
+    chain = chain.then((function (ctx, a, ebc) {
+      return function (lastResult) {
+        assert.equal(lastResult.toNumber() - standardInitialBalanceQuoted, ebc[2], "quoted balance change for " + ebc[0]);
+      };
+    }(context, accountIdForClient[client], expectedBalanceChange)));
+  }
+  return chain;
+}
+
+contract('UbiTokExchange', function(accounts) {
+  it("two orders that don't match", function() {
+    var commands = [
+      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell@0.600", 100000, 'GoodTillCancel']
+    ];
+    var expectedOrders = [
+      ["101", 'Open', 'None', 0,  0],
+      ["201", 'Open', 'None', 0,  0],
+    ];
+    var expectedBalanceChanges = [
+      ["client1",      +0, -50000],
+      ["client2", -100000,      0]
+    ];
+    var context = {
+      accounts: accounts
+    };
+    var chain = UbiTokExchange.deployed().then(function(instance) {
+      context.uut = instance;
+    });
+    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('UbiTokExchange', function(accounts) {
+  it("two orders exactly match", function() {
+    var commands = [
+      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell@0.500", 100000, 'GoodTillCancel']
+    ];
+    var expectedOrders = [
+      ["101", 'Done', 'None', 100000,  50000],
+      ["201", 'Done', 'None', 100000,  50000],
+    ];
+    var expectedBalanceChanges = [
+      ["client1", +100000, -50000],
+      ["client2", -100000, +50000]
+    ];
+    var context = {
+      accounts: accounts
+    };
+    var chain = UbiTokExchange.deployed().then(function(instance) {
+      context.uut = instance;
+    });
+    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('UbiTokExchange', function(accounts) {
+  it("two orders partial match of 2nd", function() {
+    var commands = [
+      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell@0.500", 300000, 'GoodTillCancel']
+    ];
+    var expectedOrders = [
+      ["101", 'Done', 'None', 100000,  50000],
+      ["201", 'Open', 'None', 100000,  50000],
+    ];
+    var expectedBalanceChanges = [
+      ["client1", +100000,  -50000],
+      ["client2", -300000,  +50000]
+    ];
+
+    var context = {
+      accounts: accounts
+    };
+    var chain = UbiTokExchange.deployed().then(function(instance) {
+      context.uut = instance;
+    });
+    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('UbiTokExchange', function(accounts) {
+  it("two orders best execution", function() {
+    var commands = [
+      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell@0.400", 100000, 'GoodTillCancel']
+    ];
+    var expectedOrders = [
+      ["101", 'Done', 'None', 100000,  50000],
+      ["201", 'Done', 'None', 100000,  50000],
+    ];
+    var expectedBalanceChanges = [
+      ["client1", +100000,  -50000],
+      ["client2", -100000,  +50000]
+    ];
+
+    var context = {
+      accounts: accounts
+    };
+    var chain = UbiTokExchange.deployed().then(function(instance) {
+      context.uut = instance;
+    });
+    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('UbiTokExchange', function(accounts) {
+  it("three orders mixed prices", function() {
+    var commands = [
+      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client1", "102",  "Buy@0.600", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell@0.400", 200000, 'GoodTillCancel']
+    ];
+    var expectedOrders = [
+      ["101", 'Done', 'None', 100000,  50000],
+      ["102", 'Done', 'None', 100000,  60000],
+      ["201", 'Done', 'None', 200000, 110000],
+    ];
+    var expectedBalanceChanges = [
+      ["client1", +200000, -110000],
+      ["client2", -200000, +110000]
+    ];
+    var context = {
+      accounts: accounts
+    };
+    var chain = UbiTokExchange.deployed().then(function(instance) {
+      context.uut = instance;
+    });
+    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('UbiTokExchange', function(accounts) {
+  it("order takes and makes", function() {
+    var commands = [
+      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell@0.400", 200000, 'GoodTillCancel'],
+      ['Create', 'OK', "client3", "301",  "Buy@0.500",  50000, 'GoodTillCancel'],
+    ];
+    var expectedOrders = [
+      ["101", 'Done', 'None', 100000,  50000],
+      ["201", 'Open', 'None', 150000,  70000],
+      ["301", 'Done', 'None',  50000,  20000],
+    ];
+    var expectedBalanceChanges = [
+      ["client1", +100000,  -50000],
+      ["client2", -200000,  +70000],
+      ["client3",  +50000,  -20000]
+    ];
+    var context = {
+      accounts: accounts
+    };
+    var chain = UbiTokExchange.deployed().then(function(instance) {
+      context.uut = instance;
+    });
+    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('UbiTokExchange', function(accounts) {
+  it("maker-only rejected if any would take", function() {
+    var commands = [
+      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell@0.400", 200000, 'MakerOnly']
+    ];
+    var expectedOrders = [
+      ["101", 'Open',     'None',      0,  0],
+      ["201", 'Rejected', 'WouldTake', 0,  0]
+    ];
+    var expectedBalanceChanges = [
+      ["client1", 0,  -50000],
+      ["client2", 0,       0]
+    ];
+    var context = {
+      accounts: accounts
+    };
+    var chain = UbiTokExchange.deployed().then(function(instance) {
+      context.uut = instance;
+    });
+    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('UbiTokExchange', function(accounts) {
+  it("maker-only accepted if none would take", function() {
+    var commands = [
+      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell@0.600", 200000, 'MakerOnly']
+    ];
+    var expectedOrders = [
+      ["101", 'Open', 'None', 0,  0],
+      ["201", 'Open', 'None', 0,  0]
+    ];
+    var expectedBalanceChanges = [
+      ["client1", 0,  -50000],
+      ["client2", -200000, 0]
+    ];
+    var context = {
+      accounts: accounts
+    };
+    var chain = UbiTokExchange.deployed().then(function(instance) {
+      context.uut = instance;
+    });
+    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('UbiTokExchange', function(accounts) {
+  it("IoC cancelled if none would match", function() {
+    var commands = [
+      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell@0.600", 200000, 'ImmediateOrCancel']
+    ];
+    var expectedOrders = [
+      ["101", 'Open', 'None', 0,  0],
+      ["201", 'Done', 'Unmatched', 0,  0]
+    ];
+    var expectedBalanceChanges = [
+      ["client1", 0,  -50000],
+      ["client2", 0,       0]
+    ];
+    var context = {
+      accounts: accounts
+    };
+    var chain = UbiTokExchange.deployed().then(function(instance) {
+      context.uut = instance;
+    });
+    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('UbiTokExchange', function(accounts) {
+  it("IoC completed if all matches", function() {
+    var commands = [
+      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell@0.400",  50000, 'ImmediateOrCancel']
+    ];
+    var expectedOrders = [
+      ["101", 'Open', 'None', 50000,  25000],
+      ["201", 'Done', 'None', 50000,  25000]
+    ];
+    var expectedBalanceChanges = [
+      ["client1",  50000, -50000],
+      ["client2", -50000,  25000]
+    ];
+    var context = {
+      accounts: accounts
+    };
+    var chain = UbiTokExchange.deployed().then(function(instance) {
+      context.uut = instance;
+    });
+    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('UbiTokExchange', function(accounts) {
+  it("IoC remaining cancelled if some matches", function() {
+    var commands = [
+      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell@0.400", 200000, 'ImmediateOrCancel']
+    ];
+    var expectedOrders = [
+      ["101", 'Done', 'None', 100000, 50000],
+      ["201", 'Done', 'Unmatched', 100000, 50000]
+    ];
+    var expectedBalanceChanges = [
+      ["client1",  100000, -50000],
+      ["client2", -100000,  50000]
+    ];
+    var context = {
+      accounts: accounts
+    };
+    var chain = UbiTokExchange.deployed().then(function(instance) {
+      context.uut = instance;
+    });
+    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
   });
 });
 
@@ -285,8 +641,3 @@ contract('UbiTokExchange', function(accounts) {
     });
   });
 });
-
-// TODO - check funds debited for buy / sell orders
-
-
-

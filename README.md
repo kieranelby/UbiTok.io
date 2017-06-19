@@ -8,7 +8,7 @@ UbiTok.io runs entirely on the blockchain, which for clients means:
 - no fees to pay (other than gas fees supporting the Ethereum blockchain);
 - total fairness: no preferential treatment for "special" clients.
 
-Our vision is to unleash an ecosystem of smart contracts autonomously trading smart tokens.
+Our vision is to help unleash an ecosystem of smart contracts autonomously trading smart tokens.
 
 ## See UbiTok.io in Action
 Beta Release Coming Soon!
@@ -17,7 +17,7 @@ Beta Release Coming Soon!
 As far as we know, UbiTok.io is the first decentralized exchange to meet ALL the following three tests:
  - our clients don't need to install any special P2P software;
  - we don't use an off-chain matching engine so we have no servers to shut down or be hacked;
- - we offer a true limit order book, giving clients the best possible price and all the exchange features you expect.
+ - we offer a ([full limit order book](docs/creating-orders.md)), giving clients the best possible price and the exchange features you expect.
 
 ## Who's behind UbiTok.io?
 Our technologist has a background in algorithmic trading systems. He previously spent over a decade building secure, high volume gambling sites for leading bookmakers. He first dabbled in bitcoin in 2013 before flipping to Ethereum in 2016.
@@ -31,12 +31,11 @@ Yes - transaction times are much slower than a centralised exchange. This is har
 Rather than get into a race to the bottom on exchange fees, we will offer value-added products and services that build on top of our core exchange. Email fundraising@ubitok.io if you'd like to hear about early investment opportunities.
 
 ## What's on the UbiTok.io roadmap?
-- Further optimization to reduce gas costs;
 - Host UbiTok.io front-end in Swarm/IPFS for total unstoppability;
-- Developer tools for creating smart contracts to trade via UbiTok.io;
+- Developer tools for creating smart contracts that trade via UbiTok.io - e.g. token sales, market makers;
 - Improved (human) user interface;
 - Margin trading / lending market-place;
-- Help grow ecosystem of instruments to trade such as futures or tokens backed by off-chain assets (e.g. bitcoin, USD);
+- Help grow ecosystem of instruments to trade, such as futures or tokens backed by off-chain assets (e.g. bitcoin, USD);
 
 ## Give me some technical details!
 Coming soon!

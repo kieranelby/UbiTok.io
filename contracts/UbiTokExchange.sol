@@ -26,7 +26,7 @@ contract UbiTokExchange {
     InvalidSize,
     InsufficientFunds,
     WouldTake,
-    WouldEnter,
+    Unmatched,
     TooManyMatches,
     ClientCancel
   }
@@ -58,21 +58,21 @@ contract UbiTokExchange {
     uint128 prevOrderId;
   }
   
-  event Debug(string message);
+  event Debug(string message, address client, uint amount);
   
   int8 public minimumPriceExponent = -8;
   
   string public baseTradableSymbol = 'UBI';
   uint public baseTradableDisplayDecimals = 18;
   TradableType public baseTradableType = TradableType.ERC20;
-  uint public baseMinInitialSize = 10 szabo;
-  uint public baseMinRemainingSize = 1 szabo;
+  uint public baseMinInitialSize = 10; // yes, far too small - testing only!
+  uint public baseMinRemainingSize = 100;
 
   string public quotedTradableSymbol = 'ETH';
   uint public quotedTradableDisplayDecimals = 18;
   TradableType public quotedTradableType = TradableType.Ether;
-  uint public quotedMinInitialSize = 10 finney;
-  uint public quotedMinRemainingSize = 1 finney;
+  uint public quotedMinInitialSize = 1000; // yes, far too small - testing only!
+  uint public quotedMinRemainingSize = 10000;
 
   mapping (address => uint) public balanceBaseForClient;
   mapping (address => uint) public balanceQuotedForClient;
@@ -301,9 +301,11 @@ contract UbiTokExchange {
 
     if (order.executedBase > ourOriginalExecutedBase) {
       if (isBuyPrice(order.pricePacked)) {
-        balanceBaseForClient[order.client] += order.executedBase - ourOriginalExecutedBase;
+        Debug("taker got base", order.client, (order.executedBase - ourOriginalExecutedBase));
+        balanceBaseForClient[order.client] += (order.executedBase - ourOriginalExecutedBase);
       } else {
-        balanceQuotedForClient[order.client] += order.executedQuoted - ourOriginalExecutedQuoted;
+        Debug("taker got quoted", order.client, (order.executedQuoted - ourOriginalExecutedQuoted));
+        balanceQuotedForClient[order.client] += (order.executedQuoted - ourOriginalExecutedQuoted);
       }
     }
 
@@ -315,7 +317,7 @@ contract UbiTokExchange {
         refundUnmatchedAndFinish(orderId, Status.Done, CancelOrRejectReason.TooManyMatches);
         return;
       } else if (matchStopReason == MatchStopReason.BookExhausted) {
-        refundUnmatchedAndFinish(orderId, Status.Done, CancelOrRejectReason.WouldEnter);
+        refundUnmatchedAndFinish(orderId, Status.Done, CancelOrRejectReason.Unmatched);
         return;
       }
     } else if (order.terms == Terms.MakerOnly) {
@@ -564,9 +566,11 @@ contract UbiTokExchange {
     theirOrder.executedQuoted += matchQuoted;
     if (isBuyPrice(theirPricePacked)) {
       // they have bought base (using the quoted they already paid when creating the order)
+      Debug("maker got base", theirOrder.client, matchBase);
       balanceBaseForClient[theirOrder.client] += matchBase;
     } else {
       // they have bought quoted (using the base they already paid when creating the order)
+      Debug("maker got quoted", theirOrder.client, matchQuoted);
       balanceQuotedForClient[theirOrder.client] += matchQuoted;
     }
     // TODO - dust prevention (need to refund it tho)

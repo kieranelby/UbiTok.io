@@ -1,6 +1,43 @@
 var expect    = require("chai").expect;
 var ReferenceExchange = require("../reference-exchange");
 
+var runScenario = function (commands, expectedOrders, expectedBalanceChanges) {
+  var uut = new ReferenceExchange();
+  var clients = new Set();
+  for (var cmd of commands) {
+    clients.add(cmd[2]);
+  }
+  for (var ebc of expectedBalanceChanges) {
+    clients.add(expectedBalanceChanges[0]);
+  }
+  var standardInitialBalanceBase   = 1000000000;
+  var standardInitialBalanceQuoted =  100000000;
+  for (var client of clients) {
+    uut.depositBaseForTesting(client, standardInitialBalanceBase);
+    uut.depositQuotedForTesting(client, standardInitialBalanceQuoted);
+  }
+  for (var cmd of commands) {
+    uut.createOrder(cmd[2], cmd[3], cmd[4], cmd[5], cmd[6]);
+  }
+  for (var eo of expectedOrders) {
+    var orderId = eo[0];
+    var ao = uut.getOrder(orderId);
+    expect(ao.status, "order " + orderId).to.equal(eo[1]);
+    expect(ao.cancelOrRejectReason, "order " + orderId).to.equal(eo[2]);
+    expect(ao.executedBase, "executed base of order " + orderId).to.equal(eo[3]);
+    expect(ao.executedQuoted, "executed quoted of order " + orderId).to.equal(eo[4]);
+  }
+  for (var ebc of expectedBalanceChanges) {
+    var client = ebc[0];
+    var ab = uut.getBalanceBaseForClient(client);
+    var aq = uut.getBalanceQuotedForClient(client);
+    var abc = ab - standardInitialBalanceBase;
+    var aqc = aq - standardInitialBalanceQuoted;
+    expect(abc, "base balance change for " + client).to.equal(ebc[1]);
+    expect(aqc, "quoted balance change for " + client).to.equal(ebc[2]);
+  }
+};
+
 describe("ReferenceExchange", function() {
   describe("Price Calculations", function() {
     it("computes quoted amounts", function() {
@@ -61,31 +98,97 @@ describe("ReferenceExchange", function() {
     });
   });
   describe("Order Matching", function() {
-    it("matches two very simple orders", function() {
-      var uut = new ReferenceExchange();
-      uut.depositQuotedForTesting("client1", 5100000);
-      uut.depositBaseForTesting(  "client2", 5200000);
-      // client, orderId, sidedPrice, sizeBase, terms
-      uut.createOrder("client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel');
-      uut.createOrder("client2", "201", "Sell@0.500", 100000, 'GoodTillCancel');
-      var order = uut.getOrder("101");
-      expect(order.client).to.equal("client1");
-      expect(order.price).to.equal("Buy@0.500");
-      expect(order.terms).to.equal('GoodTillCancel');
-      expect(order.sizeBase).to.equal(100000);
-      expect(order.status).to.equal('Done');
-      expect(order.cancelOrRejectReason).to.equal('None');
-      expect(order.executedBase).to.equal(100000);
-      expect(order.executedQuoted).to.equal(50000);
-      var order = uut.getOrder("201");
-      expect(order.client).to.equal("client2");
-      expect(order.price).to.equal("Sell@0.500");
-      expect(order.terms).to.equal('GoodTillCancel');
-      expect(order.sizeBase).to.equal(100000);
-      expect(order.status).to.equal('Done');
-      expect(order.cancelOrRejectReason).to.equal('None');
-      expect(order.executedBase).to.equal(100000);
-      expect(order.executedQuoted).to.equal(50000);
+    it("two orders that don't match", function() {
+      var commands = [
+        ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+        ['Create', 'OK', "client2", "201", "Sell@0.600", 100000, 'GoodTillCancel']
+      ];
+      var expectedOrders = [
+        ["101", 'Open', 'None', 0,  0],
+        ["201", 'Open', 'None', 0,  0],
+      ];
+      var expectedBalanceChanges = [
+        ["client1",      +0, -50000],
+        ["client2", -100000,      0]
+      ];
+      runScenario(commands, expectedOrders, expectedBalanceChanges);
+    });
+    it("two orders exactly match", function() {
+      var commands = [
+        ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+        ['Create', 'OK', "client2", "201", "Sell@0.500", 100000, 'GoodTillCancel']
+      ];
+      var expectedOrders = [
+        ["101", 'Done', 'None', 100000,  50000],
+        ["201", 'Done', 'None', 100000,  50000],
+      ];
+      var expectedBalanceChanges = [
+        ["client1", +100000, -50000],
+        ["client2", -100000, +50000]
+      ];
+      runScenario(commands, expectedOrders, expectedBalanceChanges);
+    });
+    it("two orders partial match of 1st", function() {
+      var commands = [
+        ['Create', 'OK', "client1", "101",  "Buy@0.500", 300000, 'GoodTillCancel'],
+        ['Create', 'OK', "client2", "201", "Sell@0.500", 100000, 'GoodTillCancel']
+      ];
+      var expectedOrders = [
+        ["101", 'Open', 'None', 100000,  50000],
+        ["201", 'Done', 'None', 100000,  50000],
+      ];
+      var expectedBalanceChanges = [
+        ["client1", +100000, -150000],
+        ["client2", -100000,  +50000]
+      ];
+      runScenario(commands, expectedOrders, expectedBalanceChanges);
+    });
+    it("two orders partial match of 2nd", function() {
+      var commands = [
+        ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+        ['Create', 'OK', "client2", "201", "Sell@0.500", 300000, 'GoodTillCancel']
+      ];
+      var expectedOrders = [
+        ["101", 'Done', 'None', 100000,  50000],
+        ["201", 'Open', 'None', 100000,  50000],
+      ];
+      var expectedBalanceChanges = [
+        ["client1", +100000,  -50000],
+        ["client2", -300000,  +50000]
+      ];
+      runScenario(commands, expectedOrders, expectedBalanceChanges);
+    });
+    it("two orders best execution", function() {
+      var commands = [
+        ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+        ['Create', 'OK', "client2", "201", "Sell@0.400", 100000, 'GoodTillCancel']
+      ];
+      var expectedOrders = [
+        ["101", 'Done', 'None', 100000,  50000],
+        ["201", 'Done', 'None', 100000,  50000],
+      ];
+      var expectedBalanceChanges = [
+        ["client1", +100000,  -50000],
+        ["client2", -100000,  +50000]
+      ];
+      runScenario(commands, expectedOrders, expectedBalanceChanges);
+    });
+    it("three orders mixed prices", function() {
+      var commands = [
+        ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
+        ['Create', 'OK', "client1", "102",  "Buy@0.600", 100000, 'GoodTillCancel'],
+        ['Create', 'OK', "client2", "201", "Sell@0.400", 200000, 'GoodTillCancel']
+      ];
+      var expectedOrders = [
+        ["101", 'Done', 'None', 100000,  50000],
+        ["102", 'Done', 'None', 100000,  60000],
+        ["201", 'Done', 'None', 200000, 110000],
+      ];
+      var expectedBalanceChanges = [
+        ["client1", +200000, -110000],
+        ["client2", -200000, +110000]
+      ];
+      runScenario(commands, expectedOrders, expectedBalanceChanges);
     });
   });
 });

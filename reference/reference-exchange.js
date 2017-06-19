@@ -249,7 +249,7 @@ ReferenceExchange.prototype.oppositePrice = function(price)  {
   } else {
     oppositeDirection = 'Invalid';
   }
-  return this._makePrice(oppositeDirection, price[1], price[2]);
+  return this._makePrice(oppositeDirection, splitPrice[1], splitPrice[2]);
 };
 
 ReferenceExchange.prototype.computeAmountQuoted = function(amountBase, price)  {
@@ -309,7 +309,7 @@ ReferenceExchange.prototype._processOrder = function(order)  {
       this._refundUnmatchedAndFinish(order, 'Done', 'TooManyMatches');
       return;
     } else if (matchStopReason === MatchStopReason.BookExhausted) {
-      this._refundUnmatchedAndFinish(order, 'Done', 'WouldEnter');
+      this._refundUnmatchedAndFinish(order, 'Done', 'Unmatched');
       return;
     }
   } else if (order.terms === 'MakerOnly') {

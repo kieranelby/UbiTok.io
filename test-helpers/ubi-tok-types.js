@@ -22,7 +22,7 @@ var enumCancelOrRejectReason = [
   'InvalidSize',
   'InsufficientFunds',
   'WouldTake',
-  'WouldEnter',
+  'Unmatched',
   'TooManyMatches',
   'ClientCancel'
 ];
@@ -84,4 +84,95 @@ exports.decodeState = function (state) {
     executedBase: state[2],
     executedQuoted: state[3]
   };
+};
+
+exports.encodePrice = function (friendlyPrice) {
+  var splitPrice = exports.splitFriendlyPrice(friendlyPrice);
+  var direction = splitPrice[0];
+  var mantissa = splitPrice[1];
+  var exponent = splitPrice[2];
+  console.log(friendlyPrice, "=>", direction, mantissa, exponent);
+  if (direction === 'Invalid') {
+     return 0;
+  }
+  if (exponent < -8 || exponent > 9) {
+    return 0;
+  }
+  if (mantissa < 100 || mantissa > 999) {
+    return 0;
+  }
+  var zeroBasedExponent = exponent + 8;
+  var zeroBasedMantissa = mantissa - 100;
+  var priceIndex = zeroBasedExponent * 900 + zeroBasedMantissa;
+  var sidedPriceIndex = (direction === 'Buy') ? 16200 - priceIndex : 16201 + priceIndex;
+  console.log(friendlyPrice, "=>", direction, mantissa, exponent, "=>", sidedPriceIndex);
+  return sidedPriceIndex;
+};
+
+exports.splitFriendlyPrice = function(price)  {
+  var invalidSplitPrice = ['Invalid', 0, 0];
+  if (!price.startsWith) {
+    return invalidSplitPrice;
+  }
+  var direction;
+  var pricePart;
+  if (price.startsWith('Buy@')) {
+    direction = 'Buy';
+    pricePart = price.substr('Buy@'.length);
+  } else if (price.startsWith('Sell@')) {
+    direction = 'Sell';
+    pricePart = price.substr('Sell@'.length);
+  } else {
+    return invalidSplitPrice;
+  }
+  var match;
+  match = pricePart.match(/^([1-9][0-9][0-9])000$/);
+  if (match) {
+    return [direction, parseInt(match[1], 10), 6];
+  }
+  match = pricePart.match(/^([1-9][0-9][0-9])00$/);
+  if (match) {
+    return [direction, parseInt(match[1], 10), 5];
+  }
+  match = pricePart.match(/^([1-9][0-9][0-9])0$/);
+  if (match) {
+    return [direction, parseInt(match[1], 10), 4];
+  }
+  match = pricePart.match(/^([1-9][0-9][0-9])$/);
+  if (match) {
+    return [direction, parseInt(match[1], 10), 3];
+  }
+  match = pricePart.match(/^([1-9][0-9])\.([0-9])$/);
+  if (match) {
+    return [direction, parseInt(match[1], 10) * 10 + parseInt(match[2], 10), 2];
+  }
+  match = pricePart.match(/^([1-9])\.([0-9][0-9])$/);
+  if (match) {
+    return [direction, parseInt(match[1], 10) * 100 + parseInt(match[2], 10), 1];
+  }
+  match = pricePart.match(/^0\.([1-9][0-9][0-9])$/);
+  if (match) {
+    return [direction, parseInt(match[1], 10), 0];
+  }
+  match = pricePart.match(/^0\.0([1-9][0-9][0-9])$/);
+  if (match) {
+    return [direction, parseInt(match[1], 10), -1];
+  }
+  match = pricePart.match(/^0\.00([1-9][0-9][0-9])$/);
+  if (match) {
+    return [direction, parseInt(match[1], 10), -2];
+  }
+  match = pricePart.match(/^0\.000([1-9][0-9][0-9])$/);
+  if (match) {
+    return [direction, parseInt(match[1], 10), -3];
+  }
+  match = pricePart.match(/^0\.0000([1-9][0-9][0-9])$/);
+  if (match) {
+    return [direction, parseInt(match[1], 10), -4];
+  }
+  match = pricePart.match(/^0\.00000([1-9][0-9][0-9])$/);
+  if (match) {
+    return [direction, parseInt(match[1], 10), -5];
+  }
+  return invalidSplitPrice;
 };
