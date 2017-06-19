@@ -17,10 +17,10 @@ Beta Release Coming Soon!
 As far as we know, UbiTok.io is the first decentralized exchange to meet ALL the following three tests:
  - our clients don't need to install any special P2P software;
  - we don't use an off-chain matching engine so we have no servers to shut down or be hacked;
- - we offer a ([full limit order book](docs/creating-orders.md)), giving clients the best possible price and the exchange features you expect.
+ - we offer a [full limit order book](docs/creating-orders.md), giving clients the best possible price and the exchange features you expect.
 
 ## Who's behind UbiTok.io?
-Our technologist has a background in algorithmic trading systems. He previously spent over a decade building secure, high volume gambling sites for leading bookmakers. He first dabbled in bitcoin in 2013 before flipping to Ethereum in 2016.
+Our principal technologist has a background in algorithmic trading systems. He previously spent over a decade building secure, high volume gambling sites for leading bookmakers. He first dabbled in bitcoin in 2013 before flipping to Ethereum in 2016.
 
 We're interested in growing our team in the near future - contact opportunities@ubitok.io.
 
