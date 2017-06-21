@@ -1,4 +1,4 @@
 build/contracts/UbiTokExchange.json
 build/contracts/Migrations.json
-reference/node_modules
+node_modules
 .vscode/launch.json
