@@ -18,7 +18,7 @@ Most limit orders can be partially filled - this can happen if, say, you enter a
 
 Because the time taken to get the transaction containing your order into the Ethereum blockchain can vary considerably, we feel Market Orders are too dangerous and do not support them. We suggest using an Immediate or Cancel Limit Order with a generous price instead.
 
-We do not currently support Stop Orders (one difficulty is how to pay the gas to cancel the order when the stop is reached), but would like to offer them in future.
+We do not currently support Stop Orders (one difficulty is how to pay the gas to trigger the order when the stop is reached), but are keen to offer them (as Stop-Limit orders) in future.
 
 ### Order Terms
 
