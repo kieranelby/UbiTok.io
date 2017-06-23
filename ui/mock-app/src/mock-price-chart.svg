@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="90mm"
+   height="50mm"
+   viewBox="0 0 90 50"
+   version="1.1"
+   id="svg4498"
+   sodipodi:docname="mock-price-chart.svg"
+   inkscape:version="0.92.1 r15371">
+  <defs
+     id="defs4492" />
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="4"
+     inkscape:cx="167.12821"
+     inkscape:cy="84.142136"
+     inkscape:document-units="mm"
+     inkscape:current-layer="layer1"
+     showgrid="false"
+     inkscape:pagecheckerboard="false"
+     inkscape:window-width="1920"
+     inkscape:window-height="1137"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1" />
+  <metadata
+     id="metadata4495">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(0,-247)">
+    <path
+       style="fill:#09cbf6;fill-opacity:1;stroke:#09cbf6;stroke-width:0.1;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;stroke-miterlimit:4;stroke-dasharray:none"
+       d="m 1.9680159,247 v 50"
+       id="path5043"
+       inkscape:connector-curvature="0"
+       inkscape:tile-cx="1.968016"
+       inkscape:tile-cy="25.000001"
+       inkscape:tile-w="0.1"
+       inkscape:tile-h="50.000001"
+       inkscape:tile-x0="1.918016"
+       inkscape:tile-y0="0" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#path5043"
+       xlink:href="#path5043"
+       id="use5099" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#path5043"
+       xlink:href="#path5043"
+       transform="translate(10.1)"
+       id="use5101" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#path5043"
+       xlink:href="#path5043"
+       transform="translate(20.200001)"
+       id="use5103" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#path5043"
+       xlink:href="#path5043"
+       transform="translate(30.300001)"
+       id="use5105" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#path5043"
+       xlink:href="#path5043"
+       transform="translate(40.400002)"
+       id="use5107" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#path5043"
+       xlink:href="#path5043"
+       transform="translate(50.500002)"
+       id="use5109" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#path5043"
+       xlink:href="#path5043"
+       transform="translate(60.600003)"
+       id="use5111" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#path5043"
+       xlink:href="#path5043"
+       transform="translate(70.700003)"
+       id="use5113" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#path5043"
+       xlink:href="#path5043"
+       transform="translate(80.800003)"
+       id="use5115" />
+    <use
+       id="use5117"
+       xlink:href="#path5043"
+       inkscape:tiled-clone-of="#path5043"
+       y="0"
+       x="0"
+       transform="matrix(0,1,-1.8016875,0,535.10119,291.98198)"
+       width="100%"
+       height="100%"
+       inkscape:tile-cx="45.042191"
+       inkscape:tile-cy="46.949997"
+       inkscape:tile-w="90.084378"
+       inkscape:tile-h="0.1"
+       inkscape:tile-x0="2.5000001e-006"
+       inkscape:tile-y0="46.899997" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#use5117"
+       xlink:href="#use5117"
+       id="use5149" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#use5117"
+       xlink:href="#use5117"
+       transform="translate(0,-9.9000004)"
+       id="use5151" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#use5117"
+       xlink:href="#use5117"
+       transform="translate(0,-19.800001)"
+       id="use5153" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#use5117"
+       xlink:href="#use5117"
+       transform="translate(0,-29.700001)"
+       id="use5155" />
+    <use
+       x="0"
+       y="0"
+       inkscape:tiled-clone-of="#use5117"
+       xlink:href="#use5117"
+       transform="translate(0,-39.600002)"
+       id="use5157" />
+    <path
+       style="fill:none;stroke:#ee545d;stroke-width:0.26458332px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 6.6145832,290.12083 6.7468748,-13.03073 3.902604,9.06198 15.742708,-25.13541 22.225,28.77343 24.407812,-34.85885"
+       id="path5161"
+       inkscape:connector-curvature="0" />
+    <path
+       style="fill:#ca0000;fill-opacity:1;stroke:none;stroke-width:0.26458332px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 81.623958,252.15312 -7.077604,4.29948 5.490104,3.63802 z"
+       id="path5167"
+       inkscape:connector-curvature="0" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;-inkscape-font-specification:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       x="3.5718744"
+       y="258.23853"
+       id="text5175"><tspan
+         sodipodi:role="line"
+         id="tspan5173"
+         x="3.5718744"
+         y="258.23853"
+         style="font-size:6.3499999px;letter-spacing:-0.08466667px;stroke-width:0.26458332">Insufficient data ...</tspan></text>
+    <rect
+       style="fill:#ffffff;fill-opacity:0.9045226;stroke:none;stroke-width:0.1;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       id="rect5185"
+       width="14.353645"
+       height="4.9609375"
+       x="47.691143"
+       y="285.15991" />
+    <text
+       id="text5179"
+       y="290.64999"
+       x="17.528646"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:10.58333302px;line-height:1.25;font-family:sans-serif;-inkscape-font-specification:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.26458332"
+       xml:space="preserve"><tspan
+         style="font-size:6.3499999px;letter-spacing:-0.29897916px;stroke-width:0.26458332"
+         y="290.64999"
+         x="17.528646"
+         id="tspan5177"
+         sodipodi:role="line">.. for a meaningful chart</tspan></text>
+  </g>
+</svg>

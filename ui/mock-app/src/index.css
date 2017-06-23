@@ -3,3 +3,14 @@ body {
   padding: 0;
   font-family: sans-serif;
 }
+
+/* https://stackoverflow.com/questions/15316559/how-to-give-a-border-to-bootstrap-tab-contents */
+
+.tab-content {
+    border-left: 1px solid #ddd;
+    border-right: 1px solid #ddd;
+    padding: 10px;
+}
+.nav-tabs {
+    margin-bottom: -1;
+}

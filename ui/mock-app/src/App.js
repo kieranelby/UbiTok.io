@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { Grid, Row, Col, Table, Button, FormGroup, FormControl, ControlLabel, HelpBlock, Tab, Tabs } from 'react-bootstrap';
-import logo from './logo.svg';
+import logo from './ubitok-logo.svg';
+import mockPriceChart from './mock-price-chart.svg';
 import './App.css';
 
 class App extends Component {
@@ -66,7 +67,7 @@ class App extends Component {
             ["Sell@1.25", "1000000"]
         ],
         "bids": [
-            ["Buy@1.24", "4000000"],
+            ["Buy@1.24", "4100000"],
             ["Buy@1.23", "5000000"]
         ]
       },
@@ -77,12 +78,12 @@ class App extends Component {
         "buy": {
           "amountBase": "",
           "price": "",
-          "costQuoted": ""
+          "costCounter": ""
         },
         "sell": {
           "amountBase": "",
           "price": "",
-          "costQuoted": ""
+          "costCounter": ""
         }
       },
       // orders we've created
@@ -152,26 +153,16 @@ class App extends Component {
       prevState.createOrder.buy.price = v;
     });
   }
-  handleCreateOrderBuyCostCounterChange = (e) => {
-    var v = e.target.value;
-    this.setState((prevState, props) => {
-      prevState.createOrder.buy.costCounter = v;
-    });
-  }
   render() {
     return (
       <div className="App">
         <div className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <h2>{this.state.app.siteName} - {this.state.pairInfo.symbol}</h2>
+          <img src={logo} className="App-logo" alt="UbiTok.io" /> the unstoppable exchange for Ethereum tokens and coins.
         </div>
-        <p className="App-intro">
-          This is a mock-up using hard-coded data in <code>src/App.js</code>.
-        </p>
         <Grid>
           <Row>
             <Col md={4}>
-                  <h3>Products</h3>
+                  <h3>{this.state.pairInfo.symbol} Info</h3>
                   <Table striped bordered condensed hover>
                     <thead>
                       <tr>
@@ -228,19 +219,36 @@ class App extends Component {
             </Col>
             <Col md={4}>
               <h3>Order Book</h3>
-              <h4>Asks (offers to sell UBI)</h4>
-              <table>
-                {this.state.book.asks.map((entry) =>
-                <tr key={entry[0]}>
-                  <td>{entry[0]}</td><td>{entry[1]}</td>
-                </tr>
-                )}
-              </table>
-              <h4>Bids (offers to buy UBI)</h4>
                 <Table striped bordered condensed hover>
                   <thead>
                     <tr>
-                      <th>Price</th>
+                      <th>Ask Price</th>
+                      <th>Depth ({this.state.pairInfo.base.symbol})</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {this.state.book.asks.map((entry) =>
+                    <tr key={entry[0]}>
+                      <td>{entry[0]}</td>
+                      <td>{entry[1]}</td>
+                    </tr>
+                    )}
+                  </tbody>
+                </Table>
+                <Table bordered condensed hover>
+                  <tbody>
+                    <tr>
+                      <td>Mid</td>
+                      <td>1.245</td>
+                      <td>Spread</td>
+                      <td>0.01</td>
+                    </tr>
+                  </tbody>
+                </Table>
+                <Table striped bordered condensed hover>
+                  <thead>
+                    <tr>
+                      <th>Bid Price</th>
                       <th>Depth ({this.state.pairInfo.base.symbol})</th>
                     </tr>
                   </thead>
@@ -256,6 +264,7 @@ class App extends Component {
             </Col>
             <Col md={4}>
               <h3>Price History</h3>
+              <img src={mockPriceChart} alt="insufficient data for a meaningful price chart" />
               <h3>Market Trades</h3>
             </Col>
           </Row>
@@ -278,17 +287,18 @@ class App extends Component {
                       <FormControl
                         type="text"
                         value={this.state.createOrder.buy.price}
-                        placeholder="Enter text"
+                        placeholder={"How many " + this.state.pairInfo.counter.symbol + " per " + this.state.pairInfo.base.symbol}
                         onChange={this.handleCreateOrderBuyPriceChange}
                       />
                       <FormControl.Feedback />
-                      <ControlLabel>Cost ({this.state.pairInfo.counter.symbol})</ControlLabel>
-                      <FormControl
-                        type="text"
-                        value={this.state.createOrder.buy.costCounter}
-                        placeholder={"How much " + this.state.pairInfo.counter.symbol + " this order will cost"}
-                        onChange={this.handleCreateOrderBuyCostCounterChange}
-                      />
+                      <ControlLabel>Cost</ControlLabel>
+                      <FormControl.Static>
+                        {this.state.createOrder.buy.costCounter !== "" ? (
+                          <span>{this.state.createOrder.buy.costCounter} {this.state.pairInfo.counter.symbol}</span>
+                        ) : (
+                          <span>(waiting for amount and price)</span>
+                        )}
+                      </FormControl.Static>
                       <FormControl.Feedback />
                       <ControlLabel>Terms</ControlLabel>
                       <FormControl componentClass="select" placeholder="select">
@@ -296,10 +306,10 @@ class App extends Component {
                         <option value="Immediate Or Cancel">Immediate Or Cancel</option>
                         <option value="MakerOnly">Maker Only</option>
                       </FormControl>
-                      <Button type="submit">
+                      <HelpBlock>Price must have 3 significant figures</HelpBlock>
+                      <Button bsStyle="primary">
                         PLACE BUY ORDER
                       </Button>
-                      <HelpBlock>Validation is based on string length.</HelpBlock>
                     </FormGroup>
                   </form>
                 </Tab>
