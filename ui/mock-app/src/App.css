@@ -2,12 +2,23 @@
 }
 
 .App-logo {
-  height: 60px;
+  height: 70px;
 }
 
 .App-header {
   background-color: #fff;
-  height: 100px;
-  padding: 20px;
+  height: 90px;
+  padding: 10px;
   text-align: center
+}
+
+#productSelectForm {
+  /* for some reason navbar-form has 15px, but we want our product select on the left. */
+  padding-left: 0px;
+}
+
+#mid-price-box {
+ margin-top: -14px; 
+ margin-bottom: 6px;
+ margin-right: 1px;
 }

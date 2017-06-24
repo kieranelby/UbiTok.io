@@ -1,8 +1,19 @@
 import React, { Component } from 'react';
-import { Grid, Row, Col, Table, Button, FormGroup, FormControl, ControlLabel, HelpBlock, Tab, Tabs } from 'react-bootstrap';
+import { Navbar, Nav, NavItem, Tab, Tabs, Well,
+         Grid, Row, Col, Table,
+         ButtonToolbar, Button, Glyphicon, 
+         FormGroup, FormControl, ControlLabel, HelpBlock } from 'react-bootstrap';
 import logo from './ubitok-logo.svg';
-import mockPriceChart from './mock-price-chart.svg';
+//import mockPriceChart from './mock-price-chart.svg';
 import './App.css';
+
+// Work around for:
+// a) passing Nav props into a form element
+// b) nav dropdown not nicely defaulting to showing chosen item
+// c) layout problems if you put a form control straight into a nav
+function MyNavForm(props) {
+  return <form className="navbar-form" id={props.id}>{props.children}</form>
+}
 
 class App extends Component {
   constructor(props) {
@@ -18,6 +29,7 @@ class App extends Component {
         "base": {
           "tradableType": "ERC20",
           "symbol": "UBI",
+          "name": "UbiTok.io",
           "address": "",
           "displayDecimals": 18,
           "minInitialSize": "10000",
@@ -26,6 +38,7 @@ class App extends Component {
         "counter": {
           "tradableType": "Ether",
           "symbol": "ETH",
+          "name": "Ether",
           "displayDecimals": 18,
           "minInitialSize": "1000000",
           "minRemainingSize": "100000",
@@ -63,12 +76,16 @@ class App extends Component {
         // price, depth 
         // TODO - we might need blockId here so we know how stale our data is?
         "asks": [
-            ["Sell@1.26", "2000000"],
-            ["Sell@1.25", "1000000"]
+            ["Sell @ 0.00000131", "2000000"],
+            ["Sell @ 0.00000130", "1000000"],
+            ["Sell @ 0.00000129", "1000000"],
+            ["Sell @ 0.00000128", "2000000"],
         ],
         "bids": [
-            ["Buy@1.24", "4100000"],
-            ["Buy@1.23", "5000000"]
+            ["Buy @ 0.00000124", "4100000"],
+            ["Buy @ 0.00000123", "5000000"],
+            ["Buy @ 0.00000122", "4100000"],
+            ["Buy @ 0.00000121", "5000000"]
         ]
       },
       // an order the user is preparing
@@ -96,14 +113,14 @@ class App extends Component {
         // perhaps contract can maintain lastOrderIdForClient + clientPrevOrderId? adds gas costs tho.
         // used when finding history with EVM events
         "startBlock": null,
-        "order": [
+        "orders": [
           // TODO - time? blockId?
           {
             "orderId": "101",
-            "price": "Buy@0.123",
+            "price": "Buy @ 0.00000123",
             "sizeBase": "2000000",
             "terms": "GoodTillCancel",
-            "status": "Open",
+            "status": "Rejected",
             "cancelOrRejectReason": "None",
             "executedBase": "500000",
             "executedQuoted": "50000"
@@ -122,12 +139,14 @@ class App extends Component {
           {
             "makerOrderId":"101",
             "takerOrderId":"102",
-            "makerPrice":"Buy@0.123",
+            "makerPrice":"Buy @ 0.00000123",
             "executedBase":"500000"
           }
         ]
       }
     };
+  }
+  handleNavSelect = (e) => {
   }
   getValidationState() {
     const length = this.state.createOrder.buy.amountBase.length;
@@ -153,127 +172,173 @@ class App extends Component {
       prevState.createOrder.buy.price = v;
     });
   }
+  
   render() {
     return (
       <div className="App">
         <div className="App-header">
-          <img src={logo} className="App-logo" alt="UbiTok.io" /> the unstoppable exchange for Ethereum tokens and coins.
+          <img src={logo} className="App-logo" alt="UbiTok.io" /> the unstoppable Ethereum token exchange
         </div>
-        <Grid>
+          <Grid>
           <Row>
-            <Col md={4}>
-                  <h3>{this.state.pairInfo.symbol} Info</h3>
-                  <Table striped bordered condensed hover>
-                    <thead>
-                      <tr>
-                        <th></th>
-                        <th>Base</th>
-                        <th>Counter</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>Symbol</td>
-                        <td>{this.state.pairInfo.base.symbol}</td>
-                        <td>{this.state.pairInfo.counter.symbol}</td>
-                      </tr>
-                      <tr>
-                        <td>Type</td>
-                        <td>{this.state.pairInfo.base.tradableType}</td>
-                        <td>{this.state.pairInfo.counter.tradableType}</td>
-                      </tr>
-                      <tr>
-                        <td>Minimum Size</td>
-                        <td>{this.state.pairInfo.base.minInitialSize}</td>
-                        <td>{this.state.pairInfo.counter.minInitialSize}</td>
-                      </tr>
-                      <tr>
-                        <td>Minimum Price</td>
-                        <td colSpan="2">{this.state.pairInfo.minPrice}</td>
-                      </tr>
-                      <tr>
-                        <td>Maximum Price</td>
-                        <td colSpan="2">{this.state.pairInfo.maxPrice}</td>
-                      </tr>
-                    </tbody>
-                  </Table>
-                  <h3>My Balances</h3>
-                  <Table striped bordered condensed hover>
-                    <thead>
-                      <tr>
-                        <th>Symbol</th>
-                        <th>Exchange Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>{this.state.pairInfo.base.symbol}</td>
-                        <td>0.0</td>
-                      </tr>
-                      <tr>
-                        <td>{this.state.pairInfo.counter.symbol}</td>
-                        <td>0.0</td>
-                      </tr>
-                    </tbody>
-                  </Table>
-            </Col>
-            <Col md={4}>
-              <h3>Order Book</h3>
-                <Table striped bordered condensed hover>
-                  <thead>
-                    <tr>
-                      <th>Ask Price</th>
-                      <th>Depth ({this.state.pairInfo.base.symbol})</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {this.state.book.asks.map((entry) =>
-                    <tr key={entry[0]}>
-                      <td>{entry[0]}</td>
-                      <td>{entry[1]}</td>
-                    </tr>
-                    )}
-                  </tbody>
-                </Table>
-                <Table bordered condensed hover>
-                  <tbody>
-                    <tr>
-                      <td>Mid</td>
-                      <td>1.245</td>
-                      <td>Spread</td>
-                      <td>0.01</td>
-                    </tr>
-                  </tbody>
-                </Table>
-                <Table striped bordered condensed hover>
-                  <thead>
-                    <tr>
-                      <th>Bid Price</th>
-                      <th>Depth ({this.state.pairInfo.base.symbol})</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {this.state.book.bids.map((entry) =>
-                    <tr key={entry[0]}>
-                      <td>{entry[0]}</td>
-                      <td>{entry[1]}</td>
-                    </tr>
-                    )}
-                  </tbody>
-                </Table>
-            </Col>
-            <Col md={4}>
-              <h3>Price History</h3>
-              <img src={mockPriceChart} alt="insufficient data for a meaningful price chart" />
-              <h3>Market Trades</h3>
-            </Col>
+          <Navbar inverse>
+            <Nav>
+              <MyNavForm id="productSelectForm">
+                <FormGroup controlId="productSelect">
+                  <FormControl componentClass="select" placeholder="Choose product">
+                    <option value="UBI/ETH">Product: UBI/ETH</option>
+                  </FormControl>
+                </FormGroup>
+              </MyNavForm>
+            </Nav>
+            <Nav bsStyle="pills" activeKey={2} onSelect={this.handleNavSelect} pullRight>
+              <NavItem eventKey={1} href="#">Home</NavItem>
+              <NavItem eventKey={2} href="#">Exchange</NavItem>
+              <NavItem eventKey={3} href="#">Help</NavItem>
+            </Nav>
+          </Navbar>
           </Row>
-          <Row>
-            <Col md={4}>
-              <h3>Create Order</h3>
-              <Tabs activeKey={this.state.createOrder.side} onSelect={this.handleCreateOrderSideSelect} id="create-order-side">
-                <Tab eventKey={"buy"} title={"BUY " + this.state.pairInfo.base.symbol}>
-                  <form>
+            <Row>
+              <Col md={4}>
+                <h3>{this.state.pairInfo.symbol} Info</h3>
+                <Table striped bordered condensed hover>
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th>Base</th>
+                      <th>Counter</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Symbol</td>
+                      <td>{this.state.pairInfo.base.symbol}</td>
+                      <td>{this.state.pairInfo.counter.symbol}</td>
+                    </tr>
+                    <tr>
+                      <td>Name</td>
+                      <td>{this.state.pairInfo.base.name}</td>
+                      <td>{this.state.pairInfo.counter.name}</td>
+                    </tr>
+                    <tr>
+                      <td>Type</td>
+                      <td>{this.state.pairInfo.base.tradableType}</td>
+                      <td>{this.state.pairInfo.counter.tradableType}</td>
+                    </tr>
+                    <tr>
+                      <td>Minimum Size</td>
+                      <td>{this.state.pairInfo.base.minInitialSize}</td>
+                      <td>{this.state.pairInfo.counter.minInitialSize}</td>
+                    </tr>
+                  </tbody>
+                </Table>
+                <h3>My Balances</h3>
+                <Table striped bordered condensed hover>
+                  <thead>
+                    <tr>
+                      <th>Symbol</th>
+                      <th>Exchange Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{this.state.pairInfo.base.symbol}</td>
+                      <td>0.0</td>
+                    </tr>
+                    <tr>
+                      <td>{this.state.pairInfo.counter.symbol}</td>
+                      <td>0.0</td>
+                    </tr>
+                  </tbody>
+                </Table>
+                <ButtonToolbar>
+                  <Button bsStyle="primary">Deposit</Button>
+                  <Button bsStyle="warning">Withdraw</Button>
+                </ButtonToolbar>
+              </Col>
+              <Col md={4}>
+                <h3>Order Book</h3>
+                  <Table striped bordered condensed hover>
+                    <thead>
+                      <tr>
+                        <th>Ask Price</th>
+                        <th>Depth ({this.state.pairInfo.base.symbol})</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {this.state.book.asks.map((entry) =>
+                      <tr key={entry[0]}>
+                        <td>{entry[0]}</td>
+                        <td>{entry[1]}</td>
+                      </tr>
+                      )}
+                    </tbody>
+                  </Table>
+                  <Well bsSize="sm" id="mid-price-box">
+                    Mid @ 0.00000126
+                    &nbsp;&nbsp;
+                    <Button bsSize="xsmall" bsStyle="info"><Glyphicon glyph="info-sign" /> See More Levels</Button>
+                  </Well>
+                  {/*
+                  <Table bordered condensed hover>
+                    <tbody>
+                      <tr>
+                        <td>Mid</td>
+                        <td>1.245</td>
+                        <td>Spread</td>
+                        <td>0.01</td>
+                      </tr>
+                    </tbody>
+                  </Table>
+                  */}
+                  <Table striped bordered condensed hover>
+                    <thead>
+                      <tr>
+                        <th>Bid Price</th>
+                        <th>Depth ({this.state.pairInfo.base.symbol})</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {this.state.book.bids.map((entry) =>
+                      <tr key={entry[0]}>
+                        <td>{entry[0]}</td>
+                        <td>{entry[1]}</td>
+                      </tr>
+                      )}
+                    </tbody>
+                  </Table>
+              </Col>
+              <Col md={4}>
+                {/*
+                <h3>Price History</h3>
+                <img src={mockPriceChart} alt="insufficient data for a meaningful price chart" />
+                */}
+                <h3>Market Trades</h3>
+                  <Table striped bordered condensed hover>
+                    <thead>
+                      <tr>
+                        <th>Time</th>
+                        <th>Maker Price</th>
+                        <th>Traded Size ({this.state.pairInfo.base.symbol})</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {this.state.marketTrades.trades.map((entry) =>
+                      <tr key={entry.makerOrderId + entry.takerOrderId}>
+                        <td>2 hours ago</td>
+                        <td>{entry.makerPrice}</td>
+                        <td>{entry.executedBase}</td>
+                      </tr>
+                      )}
+                    </tbody>
+                  </Table>
+              </Col>
+            </Row>
+            <Row>
+              <Col md={4}>
+                <h3>Create Order</h3>
+                <Tabs activeKey={this.state.createOrder.side} onSelect={this.handleCreateOrderSideSelect} id="create-order-side">
+                  <Tab eventKey={"buy"} title={"BUY " + this.state.pairInfo.base.symbol}>
                     <FormGroup controlId="createOrderBuy" validationState={this.getValidationState()}>
                       <ControlLabel>Amount ({this.state.pairInfo.base.symbol})</ControlLabel>
                       <FormControl
@@ -292,37 +357,72 @@ class App extends Component {
                       />
                       <FormControl.Feedback />
                       <ControlLabel>Cost</ControlLabel>
-                      <FormControl.Static>
+                      <HelpBlock>
                         {this.state.createOrder.buy.costCounter !== "" ? (
                           <span>{this.state.createOrder.buy.costCounter} {this.state.pairInfo.counter.symbol}</span>
                         ) : (
-                          <span>(waiting for amount and price)</span>
+                          <span>Need amount and price.</span>
                         )}
-                      </FormControl.Static>
-                      <FormControl.Feedback />
+                      </HelpBlock>
                       <ControlLabel>Terms</ControlLabel>
                       <FormControl componentClass="select" placeholder="select">
                         <option value="GoodTillCancel">Good Till Cancel</option>
+                        <option value="GoodTillCancel">Good Till Cancel with Gas Top Up</option>
                         <option value="Immediate Or Cancel">Immediate Or Cancel</option>
                         <option value="MakerOnly">Maker Only</option>
                       </FormControl>
-                      <HelpBlock>Price must have 3 significant figures</HelpBlock>
-                      <Button bsStyle="primary">
-                        PLACE BUY ORDER
-                      </Button>
                     </FormGroup>
-                  </form>
-                </Tab>
-                <Tab eventKey={"sell"} title={"SELL " + this.state.pairInfo.base.symbol}>
-                  Tab 2 content
-                </Tab>
-              </Tabs>
-            </Col>
-            <Col md={8}>
-              <h3>My Orders</h3>
-            </Col>
-          </Row>
-        </Grid>
+                    <FormGroup>
+                      <ButtonToolbar>
+                        <Button bsStyle="primary">
+                          Place Buy Order
+                        </Button>
+                      </ButtonToolbar>
+                      <HelpBlock>
+                        Order terms are explained at <a target="_blank" href="https://github.com/kieranelby/UbiTok.io/blob/master/docs/creating-orders.md">Creating Orders</a>.
+                      </HelpBlock>
+                    </FormGroup>
+                  </Tab>
+                  <Tab eventKey={"sell"} title={"SELL " + this.state.pairInfo.base.symbol}>
+                    Tab 2 content
+                  </Tab>
+                </Tabs>
+              </Col>
+              <Col md={8}>
+                <h3>My Orders</h3>
+                  <Table striped bordered condensed hover>
+                    <thead>
+                      <tr>
+                        <th>Created</th>
+                        <th>Price</th>
+                        <th>Size ({this.state.pairInfo.base.symbol})</th>
+                        <th>Status</th>
+                        <th>Filled ({this.state.pairInfo.base.symbol})</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {this.state.myOrders.orders.map((entry) =>
+                      <tr key={entry.orderId}>
+                        <td>5 mins ago</td>
+                        <td>{entry.price}</td>
+                        <td>{entry.sizeBase}</td>
+                        <td>{entry.status}</td>
+                        <td>{entry.executedBase}</td>
+                        <td>
+                          <ButtonToolbar>
+                            <Button bsSize="xsmall" bsStyle="info"><Glyphicon glyph="info-sign" title="more info" /></Button>
+                            <Button bsSize="xsmall" bsStyle="danger"><Glyphicon glyph="remove" title="cancel order" /></Button>
+                            <Button bsSize="xsmall" bsStyle="primary">Continue</Button>
+                          </ButtonToolbar>
+                        </td>
+                      </tr>
+                      )}
+                    </tbody>
+                  </Table>
+              </Col>
+            </Row>
+          </Grid>
       </div>
     );
   }
