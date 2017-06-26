@@ -58,14 +58,14 @@ Email fundraising@ubitok.io if you'd like to hear about early investment opportu
 ## What's on the UbiTok.io roadmap?
 - Alpha testnet release (Jul/Aug 2017);
 - Beta real money release (Sep/Oct 2017);
-- Developer tools for creating smart contracts that trade via UbiTok.io - e.g. for market making, maintain a reseve pool, running ICOs (2017Q4);
-- Launch our own bitcoin-backed smart token, UBITC, to allow ETH/BTC trading (tbc)
+- Developer tools for creating smart contracts that trade via UbiTok.io - e.g. for market making, maintaining a reseve pool, running ICOs (2017Q4);
 - Improved user interface and price charts (2017Q4);
+- Launch our own bitcoin-backed smart token, UBITC, to allow ETH/BTC trading (tbc)
 - Margin trading / lending market-place (tbc);
-- Host UbiTok.io front-end in Swarm/IPFS for total unstoppability (2018);
+- Host UbiTok.io front-end in Swarm/IPFS for total unstoppability (tbc);
 - Derivative contracts - e.g. futures, options (tbc)
 
-Perhaps you have some ideas for smart tokens that can be traded on our exchange, or for autonomous smart contracts that place orders into the exchange - we look forward to seeing what can be done with an on-chain trading venue!
+Perhaps you have some ideas for smart tokens that can be traded on our exchange, or for autonomous smart contracts that place orders into the exchange - we look forward to seeing what can be done with a fully on-chain trading venue.
 
 ## Give me some technical details!
 We're going to publish full details of how our contracts work as soon as we've reached our alpha release - in the meantime, here's the original sketch showing the key technique (we call it "price packing") that allows efficient on-chain best execution matching:
