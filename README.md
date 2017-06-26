@@ -5,7 +5,7 @@ UbiTok.io runs entirely on the blockchain, which for clients means:
 - no limits, no sign-up, no waiting for support to verify you;
 - it cannot be shutdown by regulators - or even by its creators;
 - you don't need to trust the exchange employees to look after your coins;
-- no exchange fees (other than gas to power the Ethereum blockchain);
+- ultra-low exchange fees (plus a little gas to power the Ethereum blockchain);
 - total fairness: no preferential treatment for "special" clients.
 
 We aim to be the leading venue for trading Ethereum assets on-chain, and to help grow an ecosystem of smart contracts trading with each other (and with you).
@@ -42,9 +42,14 @@ We're interested in growing our team in the near future - contact opportunities@
 Yes - transaction times are much slower than a centralised exchange. This is hard to avoid - we need 1000s of Ethereum nodes worldwide to agree on the state of the orderbook (without trusting each other). You won't find High Frequency Traders on UbiTok.io - not necessarily a bad thing for everyone else! We've also had to reduce the number of price levels offered to allow us to perform best execution on-chain - so you'll see prices like 1.23, not 1.2298502.
 
 ## What are your fees? How do UbiTok.io make money?
-We charge no fees (0%) for deposits, withdrawals, or for trading.
+Because we're not dealing with banks, or user sign-ups, or hosting providers, we have much lower costs than traditional exchanges.
 
-Rather than get into a race to the bottom on exchange fees, we hope to offer value-added products and services that build on top of our core exchange.
+We guarantee to:
+ - never charge any fees (0%) for depositing or withdrawing Ethereum, or Ethereum-based tokens;
+ - never charge any trading fees (0%) for orders that add liquidity to the exchange (that is, orders that rest on the book);
+ - never charge a trading fee of more than 0.1% for orders that take liquidity from the exchange (that is, orders that match against an order on the book)
+
+We hope to go totally fee-free by offering value-added products and services that build on top of our core exchange - see roadmap below.
 
 Email fundraising@ubitok.io if you'd like to hear about early investment opportunities.
 
