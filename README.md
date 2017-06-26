@@ -1,20 +1,34 @@
 # UbiTok.io
-an unstoppable exchange for buying and selling Ethereum tokens and coins.
+an unstoppable exchange for trading Ethereum tokens
 
 UbiTok.io runs entirely on the blockchain, which for clients means:
 - no limits, no sign-up, no waiting for support to verify you;
 - it cannot be shutdown by regulators - or even by its creators;
 - you don't need to trust the exchange employees to look after your coins;
-- no fees to pay (other than gas fees supporting the Ethereum blockchain);
+- ultra-low exchange fees (plus a little gas to power the Ethereum blockchain);
 - total fairness: no preferential treatment for "special" clients.
 
-Our vision is to help unleash an ecosystem of smart contracts autonomously trading smart tokens.
+We aim to be the leading venue for trading Ethereum assets on-chain, and to help grow an ecosystem of smart contracts trading with each other (and with you).
 
 ## See UbiTok.io in Action
-Beta Release Coming Soon!
+Beta release coming soon!
+
+## What can I trade on UbiTok.io?
+Almost anything based on Ethereum (such as ERC20 tokens) can be traded on UbiTok.io, either against Ethereum or against other tokens.
+
+This includes coins/tokens connected to organisations in various industries such as:
+- DICE - gambling
+- REP (Augur), GNO (Gnosis) - prediction markets
+- BAT - advertising
+- MYST - networking
+
+As well as tokens backed by assets, including:
+- DGD - physical gold;
+- BNT (Bancor), VERI - smart reserves;
+- UBITC - our planned full-reserve Bitcoin-backed ERC20 token
 
 ## How does UbiTok.io compare to other decentralized exchanges?
-As far as we know, UbiTok.io is the first decentralized exchange to meet ALL the following three tests:
+As far as we know, UbiTok.io is the first decentralized exchange to meet the following three tests:
  - our clients don't need to install any special P2P software;
  - we don't use an off-chain matching engine so we have no servers to shut down or be hacked;
  - we offer a [full limit order book](docs/creating-orders.md), giving clients the best possible price and the exchange features you expect.
@@ -27,15 +41,29 @@ We're interested in growing our team in the near future - contact opportunities@
 ## Are there downsides to being 100% on-chain?
 Yes - transaction times are much slower than a centralised exchange. This is hard to avoid - we need 1000s of Ethereum nodes worldwide to agree on the state of the orderbook (without trusting each other). You won't find High Frequency Traders on UbiTok.io - not necessarily a bad thing for everyone else! We've also had to reduce the number of price levels offered to allow us to perform best execution on-chain - so you'll see prices like 1.23, not 1.2298502.
 
-## No fees? How do UbiTok.io make money?
-Rather than get into a race to the bottom on exchange fees, we will offer value-added products and services that build on top of our core exchange. Email fundraising@ubitok.io if you'd like to hear about early investment opportunities.
+## What are your fees? How do UbiTok.io make money?
+Because we're not dealing with banks, or user sign-ups, or hosting providers, we have much lower costs than traditional exchanges.
+
+We guarantee to:
+ - never charge any fees (0%) for depositing or withdrawing Ethereum, or Ethereum-based tokens;
+ - never charge any trading fees (0%) for orders that add liquidity to the exchange (that is, orders that rest on the book);
+ - never charge a trading fee of more than 0.1% for orders that take liquidity from the exchange (that is, orders that match against an order on the book)
+
+We hope to go totally fee-free by offering value-added products and services that build on top of our core exchange - see roadmap below.
+
+Email fundraising@ubitok.io if you'd like to hear about early investment opportunities.
 
 ## What's on the UbiTok.io roadmap?
-- Host UbiTok.io front-end in Swarm/IPFS for total unstoppability;
-- Developer tools for creating smart contracts that trade via UbiTok.io - e.g. token sales, market makers;
-- Improved (human) user interface;
-- Margin trading / lending market-place;
-- Help grow ecosystem of instruments to trade, such as futures or tokens backed by off-chain assets (e.g. bitcoin, USD);
+- Alpha testnet release (Aug 2017);
+- Beta real money release (Oct 2017);
+- Developer tools for creating smart contracts that trade via UbiTok.io - e.g. for running ICOs (2017Q4);
+- Launch our own bitcoin-backed smart token, UBITC, to allow ETH/BTC trading (tbc)
+- Improved user interface and price charts (2017Q4);
+- Margin trading / lending market-place (tbc);
+- Host UbiTok.io front-end in Swarm/IPFS for total unstoppability (2018);
+- Derivative contracts (futures, options) (tbc)
+
+Perhaps you have some ideas for smart tokens that can be traded on our exchange, or for autonomous smart contracts that place orders into the exchange - we look forward to seeing what can be done with an on-chain trading venue!
 
 ## Give me some technical details!
 Coming soon!
