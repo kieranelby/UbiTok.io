@@ -120,7 +120,7 @@ class App extends Component {
             "price": "Buy @ 0.00000123",
             "sizeBase": "2000000",
             "terms": "GoodTillCancel",
-            "status": "Rejected",
+            "status": "Open",
             "cancelOrRejectReason": "None",
             "executedBase": "500000",
             "executedQuoted": "50000"
@@ -268,7 +268,7 @@ class App extends Component {
                     <tbody>
                       {this.state.book.asks.map((entry) =>
                       <tr key={entry[0]}>
-                        <td>{entry[0]}</td>
+                        <td className="sell">{entry[0]}</td>
                         <td>{entry[1]}</td>
                       </tr>
                       )}
@@ -277,7 +277,6 @@ class App extends Component {
                   <Well bsSize="sm" id="mid-price-box">
                     Mid @ 0.00000126
                     &nbsp;&nbsp;
-                    <Button bsSize="xsmall" bsStyle="info"><Glyphicon glyph="info-sign" /> See More Levels</Button>
                   </Well>
                   {/*
                   <Table bordered condensed hover>
@@ -301,7 +300,7 @@ class App extends Component {
                     <tbody>
                       {this.state.book.bids.map((entry) =>
                       <tr key={entry[0]}>
-                        <td>{entry[0]}</td>
+                        <td className="buy">{entry[0]}</td>
                         <td>{entry[1]}</td>
                       </tr>
                       )}
@@ -326,7 +325,7 @@ class App extends Component {
                       {this.state.marketTrades.trades.map((entry) =>
                       <tr key={entry.makerOrderId + entry.takerOrderId}>
                         <td>2 hours ago</td>
-                        <td>{entry.makerPrice}</td>
+                        <td className="buy">{entry.makerPrice}</td>
                         <td>{entry.executedBase}</td>
                       </tr>
                       )}
@@ -405,7 +404,7 @@ class App extends Component {
                       {this.state.myOrders.orders.map((entry) =>
                       <tr key={entry.orderId}>
                         <td>5 mins ago</td>
-                        <td>{entry.price}</td>
+                        <td className="buy">{entry.price}</td>
                         <td>{entry.sizeBase}</td>
                         <td>{entry.status}</td>
                         <td>{entry.executedBase}</td>
@@ -413,7 +412,7 @@ class App extends Component {
                           <ButtonToolbar>
                             <Button bsSize="xsmall" bsStyle="info"><Glyphicon glyph="info-sign" title="more info" /></Button>
                             <Button bsSize="xsmall" bsStyle="danger"><Glyphicon glyph="remove" title="cancel order" /></Button>
-                            <Button bsSize="xsmall" bsStyle="primary">Continue</Button>
+                            {/*<Button bsSize="xsmall" bsStyle="primary">Continue</Button>*/}
                           </ButtonToolbar>
                         </td>
                       </tr>

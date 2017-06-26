@@ -22,3 +22,11 @@
  margin-bottom: 6px;
  margin-right: 1px;
 }
+
+.buy {
+  color: #208020;
+}
+
+.sell {
+  color: #900020;
+}

@@ -184,9 +184,9 @@ contract('UbiTokExchange', function(accounts) {
       uut = instance;
       return uut.depositQuotedForTesting(accounts[0], web3.toWei(2, 'finney'), {from: accounts[0]});
     }).then(function(result) {
-      return uut.balanceQuotedForClient.call(accounts[0]);
-    }).then(function(balanceQuoted) {
-      balanceQuotedAfterDeposit = balanceQuoted;
+      return uut.getClientBalances.call(accounts[0]);
+    }).then(function(balances) {
+      balanceQuotedAfterDeposit = balances[1];
     });
   });
   badOrders.forEach(function(badOrder) {
@@ -201,9 +201,9 @@ contract('UbiTokExchange', function(accounts) {
         var state = UbiTokTypes.decodeState(result);
         assert.equal(state.status, 'Rejected');
         assert.equal(state.rejectReason, badOrder[5]);
-        return uut.balanceQuotedForClient.call(accounts[0]);
-      }).then(function(balanceQuotedAfterOrderRejected) {
-        assert.equal(balanceQuotedAfterOrderRejected.toString(), balanceQuotedAfterDeposit.toString());
+        return uut.getClientBalances.call(accounts[0]);
+      }).then(function(balancesAfterOrderRejected) {
+        assert.equal(balancesAfterOrderRejected[1].toString(), balanceQuotedAfterDeposit.toString());
       });
     });
   });
@@ -272,22 +272,13 @@ function buildScenario(chain, context, commands, expectedOrders, expectedBalance
     chain = chain.then((function (ctx, a, ebc) {
       return function (lastResult) {
         console.log("getting balance of " + ctx.accounts[a]);
-        return ctx.uut.balanceBaseForClient.call(ctx.accounts[a]);
+        return ctx.uut.getClientBalances.call(ctx.accounts[a]);
       };
     }(context, accountIdForClient[client], expectedBalanceChange)));
     chain = chain.then((function (ctx, a, ebc) {
       return function (lastResult) {
-        assert.equal(lastResult.toNumber() - standardInitialBalanceBase, ebc[1], "base balance change for " + ebc[0]);
-      };
-    }(context, accountIdForClient[client], expectedBalanceChange)));
-    chain = chain.then((function (ctx, a, ebc) {
-      return function (lastResult) {
-        return ctx.uut.balanceQuotedForClient.call(ctx.accounts[a]);
-      };
-    }(context, accountIdForClient[client], expectedBalanceChange)));
-    chain = chain.then((function (ctx, a, ebc) {
-      return function (lastResult) {
-        assert.equal(lastResult.toNumber() - standardInitialBalanceQuoted, ebc[2], "quoted balance change for " + ebc[0]);
+        assert.equal(lastResult[0].toNumber() - standardInitialBalanceBase, ebc[1], "base balance change for " + ebc[0]);
+        assert.equal(lastResult[1].toNumber() - standardInitialBalanceQuoted, ebc[2], "quoted balance change for " + ebc[0]);
       };
     }(context, accountIdForClient[client], expectedBalanceChange)));
   }

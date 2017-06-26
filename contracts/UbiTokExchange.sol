@@ -74,8 +74,8 @@ contract UbiTokExchange {
   uint public quotedMinInitialSize = 1000; // yes, far too small - testing only!
   uint public quotedMinRemainingSize = 10000;
 
-  mapping (address => uint) public balanceBaseForClient;
-  mapping (address => uint) public balanceQuotedForClient;
+  mapping (address => uint) balanceBaseForClient;
+  mapping (address => uint) balanceQuotedForClient;
   
   mapping (uint128 => Order) orderForOrderId;
   
@@ -93,6 +93,12 @@ contract UbiTokExchange {
   function UbiTokExchange() {
   }
   
+  // Public Funds View.
+  //
+  function getClientBalances(address client) public constant returns (uint balanceBase, uint balanceQuoted) {
+    return (balanceBaseForClient[client], balanceQuotedForClient[client]);
+  }
+
   // Public Funds Manipulation.
   //
   function depositBaseForTesting(address client, uint amountBase) public {
