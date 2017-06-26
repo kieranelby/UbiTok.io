@@ -58,7 +58,7 @@ Email fundraising@ubitok.io if you'd like to hear about early investment opportu
 ## What's on the UbiTok.io roadmap?
 - Alpha testnet release (Jul/Aug 2017);
 - Beta real money release (Sep/Oct 2017);
-- Developer tools for creating smart contracts that trade via UbiTok.io - e.g. for market making, maintaining a reseve pool, running ICOs (2017Q4);
+- Developer tools for creating smart contracts that trade via UbiTok.io - e.g. for market making, maintaining a pool of reserves, running ICOs (2017Q4);
 - Improved user interface and price charts (2017Q4);
 - Launch our own bitcoin-backed smart token, UBITC, to allow ETH/BTC trading (tbc)
 - Margin trading / lending market-place (tbc);
