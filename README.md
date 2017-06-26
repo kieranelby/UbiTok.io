@@ -11,7 +11,9 @@ UbiTok.io runs entirely on the blockchain, which for clients means:
 We aim to be the leading venue for trading Ethereum assets on-chain, and to help grow an ecosystem of smart contracts trading with each other (and with you).
 
 ## See UbiTok.io in Action
-Beta release coming soon!
+Beta release coming soon ...
+
+![Demo Screenshot](docs/screenshot.png)
 
 ## What can I trade on UbiTok.io?
 Almost anything based on Ethereum (such as ERC20 tokens) can be traded on UbiTok.io, either against Ethereum or against other tokens.
