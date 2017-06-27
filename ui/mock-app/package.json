@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "ubi-bootstrap": "file:../ubi-bootstrap",
+    "immutability-helper": "^2.2.2",
     "react": "^15.6.1",
     "react-bootstrap": "^0.31.0",
-    "react-dom": "^15.6.1"
+    "react-dom": "^15.6.1",
+    "ubi-bootstrap": "file:../ubi-bootstrap",
+    "web3": "^0.19.1"
   },
   "devDependencies": {
     "react-scripts": "1.0.7"

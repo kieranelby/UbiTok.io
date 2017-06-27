@@ -3,9 +3,13 @@ import { Navbar, Nav, NavItem, Tab, Tabs, Well,
          Grid, Row, Col, Table,
          ButtonToolbar, Button, Glyphicon, 
          FormGroup, FormControl, ControlLabel, HelpBlock } from 'react-bootstrap';
+import update from 'immutability-helper';
+
 import logo from './ubitok-logo.svg';
 //import mockPriceChart from './mock-price-chart.svg';
 import './App.css';
+
+import Web3 from 'web3';
 
 // Work around for:
 // a) passing Nav props into a form element
@@ -15,9 +19,132 @@ function MyNavForm(props) {
   return <form className="navbar-form" id={props.id}>{props.children}</form>
 }
 
+class Bridge {
+
+  constructor(bookContractAddress) {
+    this.ready = false;
+    this.bookContractAddress = bookContractAddress;
+    window.setTimeout(this.pollForWeb3, 1000);
+  }
+
+  pollForWeb3 = () => {
+    if (this.ready) {
+      return;
+    }
+    if (typeof window.web3 !== 'undefined') {
+      // Use Mist/MetaMask's provider
+      console.log('found web3');
+      this.web3 = new Web3(window.web3.currentProvider);
+      var abiArray = [{"constant":true,"inputs":[],"name":"baseTradableType","outputs":[{"name":"","type":"uint8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"pricePacked","type":"uint16"}],"name":"unpackPrice","outputs":[{"name":"direction","type":"uint8"},{"name":"mantissa","type":"uint16"},{"name":"exponent","type":"int8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"orderId","type":"uint128"}],"name":"getOrder","outputs":[{"name":"client","type":"address"},{"name":"pricePacked","type":"uint16"},{"name":"sizeBase","type":"uint256"},{"name":"terms","type":"uint8"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"client","type":"address"},{"name":"amountQuoted","type":"uint256"}],"name":"depositQuotedForTesting","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseMinInitialSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedTradableDisplayDecimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"orderId","type":"uint128"}],"name":"getOrderState","outputs":[{"name":"status","type":"uint8"},{"name":"cancelOrRejectReason","type":"uint8"},{"name":"executedBase","type":"uint256"},{"name":"executedQuoted","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseMinRemainingSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"orderId","type":"uint128"}],"name":"nextOpenOrderFrom","outputs":[{"name":"isStillOpen","type":"bool"},{"name":"nextOrderId","type":"uint128"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"pricePacked","type":"uint16"}],"name":"oppositePackedPrice","outputs":[{"name":"","type":"uint16"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"minimumPriceExponent","outputs":[{"name":"","type":"int8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"client","type":"address"}],"name":"getClientBalances","outputs":[{"name":"balanceBase","type":"uint256"},{"name":"balanceQuoted","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedMinRemainingSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"baseAmount","type":"uint256"},{"name":"mantissa","type":"uint16"},{"name":"exponent","type":"int8"}],"name":"computeQuotedAmount","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"baseAmount","type":"uint256"},{"name":"pricePacked","type":"uint16"}],"name":"computeQuotedAmountUsingPacked","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"direction","type":"uint8"},{"name":"mantissa","type":"uint16"},{"name":"exponent","type":"int8"}],"name":"packPrice","outputs":[{"name":"","type":"uint16"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"client","type":"address"},{"name":"amountBase","type":"uint256"}],"name":"depositBaseForTesting","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"pricePacked","type":"uint16"}],"name":"findFirstOpenOrderFrom","outputs":[{"name":"orderId","type":"uint128"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"orderId","type":"uint128"},{"name":"pricePacked","type":"uint16"},{"name":"sizeBase","type":"uint256"},{"name":"terms","type":"uint8"}],"name":"createOrder","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedMinInitialSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseTradableSymbol","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedTradableType","outputs":[{"name":"","type":"uint8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"validPricePacked","type":"uint16"}],"name":"isBuyPrice","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseTradableDisplayDecimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedTradableSymbol","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function"},{"inputs":[],"payable":false,"type":"constructor"},{"anonymous":false,"inputs":[{"indexed":false,"name":"message","type":"string"},{"indexed":false,"name":"client","type":"address"},{"indexed":false,"name":"amount","type":"uint256"}],"name":"Debug","type":"event"}];
+      var BookContract = this.web3.eth.contract(abiArray);
+      this.bookContract = BookContract.at(this.bookContractAddress);
+      this.ready = true;
+    } else {
+      console.log('No web3? You should consider trying MetaMask! Perhaps if we wait it will be injected ...');
+    }
+    window.setTimeout(this.pollForWeb3, 1000);
+  }
+
+  subscribeNetworkAndAccountInfo(callback) {
+      
+  }
+
+  checkReady(callbackIfNot) {
+    if (!this.ready) {
+      window.setTimeout(function () { callbackIfNot(new Error('not ready'))}, 0);
+    }
+    return this.ready;
+  }
+
+  getExchangeBalances(callback) {
+    if (!this.checkReady(callback)) {
+      return;
+    }
+    this.bookContract.getClientBalances.call(this.web3.eth.accounts[0], callback);
+  }
+
+    getErc20Balance(erc20addr, callback) {
+
+    }
+
+    getErc20Approved(erc20addr, callback) {
+
+    }
+
+    getEtherBalance(callback) {
+
+    }
+
+    submitCounterEtherDeposit (amount, callback) {
+
+    }
+
+    submitErc20Approve (erc20addr, amount, callback) {
+
+    }
+
+    submitErc20Unapprove (erc20addr, amount, callback) {
+
+    }
+
+    submitBaseErc20Deposit ( amount, callback ) {
+
+    }
+
+    submitCounterEtherWithdraw ( amount, callback ) {
+
+    }
+
+    submitBaseErc20Withdraw ( amount, callback ) {
+
+    }
+
+    getBookDepthStart (side, callback) {
+
+    }
+
+    getBookDepthNext (continueFrom, callback) {
+
+    }
+
+    submitCreateOrder (orderId, price, sizeBase, terms, callback) {
+
+    }
+    
+    submitContinueOrder (orderId, callback) {
+
+    }
+
+    submitCancelOrder (orderId, callback) {
+
+    }
+
+    getOrder(orderId, callback) {
+
+    }
+
+    getOrderStatus(orderId, callback) {
+
+    }
+
+    getAllOrderIdsFor(client, fromBlock, callback) {
+
+    }
+
+    getAllMarketEvents(fromBlock, toBlock, callback) {
+
+    }
+
+    subscribeAllMarketEvents(fromBlock, callback) {
+
+    }
+
+}
+
 class App extends Component {
   constructor(props) {
     super(props);
+    this.bridge = new Bridge('0x7b4814c3582f612e6f0640ef233d77e758539c14');
     this.state = {
       // where are we?
       "app": {
@@ -145,6 +272,22 @@ class App extends Component {
         ]
       }
     };
+    window.setInterval(this.pollExchangeBalances, 2000);
+  }
+  pollExchangeBalances = () => {
+    this.bridge.getExchangeBalances(function (error, newClientBalances) {
+      if (error) {
+        console.log(error);
+        return;
+      }
+      this.setState((prevState, props) => {
+        return {
+          balances: update(prevState.balances, {
+            exchange: {$set: newClientBalances},
+          })
+        }
+      });
+    }.bind(this));
   }
   handleNavSelect = (e) => {
   }
@@ -157,18 +300,24 @@ class App extends Component {
   handleCreateOrderSideSelect = (e) => {
     var v = e; // no event object for this one?
     this.setState((prevState, props) => {
-      prevState.createOrder.side = v;
+      return {
+        createOrder: update(prevState.createOrder, {
+          side: {$set: v},
+        })
+      }
     });
   }
   handleCreateOrderBuyAmountBaseChange = (e) => {
     var v = e.target.value;
     this.setState((prevState, props) => {
+      // TODO - wrong but working by accident!
       prevState.createOrder.buy.amountBase = v;
     });
   }
   handleCreateOrderBuyPriceChange = (e) => {
     var v = e.target.value;
     this.setState((prevState, props) => {
+      // TODO - wrong but working by accident!
       prevState.createOrder.buy.price = v;
     });
   }
@@ -243,11 +392,11 @@ class App extends Component {
                   <tbody>
                     <tr>
                       <td>{this.state.pairInfo.base.symbol}</td>
-                      <td>0.0</td>
+                      <td>{this.state.balances.exchange[0].toString()}</td>
                     </tr>
                     <tr>
                       <td>{this.state.pairInfo.counter.symbol}</td>
-                      <td>0.0</td>
+                      <td>{this.state.balances.exchange[1].toString()}</td>
                     </tr>
                   </tbody>
                 </Table>
