@@ -8,6 +8,7 @@
     "react-bootstrap": "^0.31.0",
     "react-dom": "^15.6.1",
     "ubi-bootstrap": "file:../ubi-bootstrap",
+    "ubi-lib": "file:../../ubi-lib",
     "web3": "^0.19.1"
   },
   "devDependencies": {

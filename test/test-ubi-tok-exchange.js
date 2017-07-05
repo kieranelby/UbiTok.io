@@ -1,6 +1,6 @@
 var UbiTokExchange = artifacts.require("UbiTokExchange");
 
-var UbiTokTypes = require('../test-helpers/ubi-tok-types.js');
+var UbiTokTypes = require('../ubi-lib/ubi-tok-types.js');
 
 contract('UbiTokExchange', function(accounts) {
 
@@ -50,18 +50,17 @@ contract('UbiTokExchange', function(accounts) {
 
   it("should pack and unpack valid prices", function() {
     var examples = [
-      [UbiTokTypes.encodeDirection('Buy'),      999,   9,     1, "buy price max"],
-      [UbiTokTypes.encodeDirection('Buy'),      999,   9,     1, "buy price max"],
-      [UbiTokTypes.encodeDirection('Buy'),      100,  -8, 16200, "buy price min"],
-      [UbiTokTypes.encodeDirection('Buy'),      500,   2,  6800, "buy price 50.0"],
-      [UbiTokTypes.encodeDirection('Buy'),      100,   1,  8100, "buy price 1.0"],
-      [UbiTokTypes.encodeDirection('Buy'),      123,  -1,  9877, "buy price 0.0123"],
-      [UbiTokTypes.encodeDirection('Sell'),     100,  -8, 16201, "sell price min"],
-      [UbiTokTypes.encodeDirection('Sell'),     999,   9, 32400, "sell price max"],
-      [UbiTokTypes.encodeDirection('Sell'),     500,   2, 25601, "sell price 50.0"],
-      [UbiTokTypes.encodeDirection('Sell'),     123,  -1, 22524, "sell price 0.0123"],
-      [UbiTokTypes.encodeDirection('Sell'),     100,  -2, 21601, "sell price 0.001"],
-      [UbiTokTypes.encodeDirection('Sell'),     999,  -3, 21600, "sell price 0.000999"]
+      [UbiTokTypes.encodeDirection('Buy'),      999,   5,     1, "buy price max"],
+      [UbiTokTypes.encodeDirection('Buy'),      100,  -6, 10800, "buy price min"],
+      [UbiTokTypes.encodeDirection('Buy'),      500,   2,  3200, "buy price 50.0"],
+      [UbiTokTypes.encodeDirection('Buy'),      100,   1,  4500, "buy price 1.0"],
+      [UbiTokTypes.encodeDirection('Buy'),      123,  -1,  6277, "buy price 0.0123"],
+      [UbiTokTypes.encodeDirection('Sell'),     100,  -6, 10801, "sell price min"],
+      [UbiTokTypes.encodeDirection('Sell'),     999,   5, 21600, "sell price max"],
+      [UbiTokTypes.encodeDirection('Sell'),     500,   2, 18401, "sell price 50.0"],
+      [UbiTokTypes.encodeDirection('Sell'),     123,  -1, 15324, "sell price 0.0123"],
+      [UbiTokTypes.encodeDirection('Sell'),     100,  -2, 14401, "sell price 0.001"],
+      [UbiTokTypes.encodeDirection('Sell'),     999,  -3, 14400, "sell price 0.000999"]
     ];
     var uut;
     return UbiTokExchange.deployed().then(function(instance) {
@@ -105,18 +104,17 @@ contract('UbiTokExchange', function(accounts) {
 
   it("should calculate opposite packed price", function() {
     var examples = [
-      [UbiTokTypes.encodeDirection('Buy'),      999,   9,     1, "buy price max"],
-      [UbiTokTypes.encodeDirection('Buy'),      999,   9,     1, "buy price max"],
-      [UbiTokTypes.encodeDirection('Buy'),      100,  -8, 16200, "buy price min"],
-      [UbiTokTypes.encodeDirection('Buy'),      500,   2,  6800, "buy price 50.0"],
-      [UbiTokTypes.encodeDirection('Buy'),      100,   1,  8100, "buy price 1.0"],
-      [UbiTokTypes.encodeDirection('Buy'),      123,  -1,  9877, "buy price 0.0123"],
-      [UbiTokTypes.encodeDirection('Sell'),     100,  -8, 16201, "sell price min"],
-      [UbiTokTypes.encodeDirection('Sell'),     999,   9, 32400, "sell price max"],
-      [UbiTokTypes.encodeDirection('Sell'),     500,   2, 25601, "sell price 50.0"],
-      [UbiTokTypes.encodeDirection('Sell'),     123,  -1, 22524, "sell price 0.0123"],
-      [UbiTokTypes.encodeDirection('Sell'),     100,  -2, 21601, "sell price 0.001"],
-      [UbiTokTypes.encodeDirection('Sell'),     999,  -3, 21600, "sell price 0.000999"]
+      [UbiTokTypes.encodeDirection('Buy'),      999,   5,     1, "buy price max"],
+      [UbiTokTypes.encodeDirection('Buy'),      100,  -6, 10800, "buy price min"],
+      [UbiTokTypes.encodeDirection('Buy'),      500,   2,  3200, "buy price 50.0"],
+      [UbiTokTypes.encodeDirection('Buy'),      100,   1,  4500, "buy price 1.0"],
+      [UbiTokTypes.encodeDirection('Buy'),      123,  -1,  6277, "buy price 0.0123"],
+      [UbiTokTypes.encodeDirection('Sell'),     100,  -6, 10801, "sell price min"],
+      [UbiTokTypes.encodeDirection('Sell'),     999,   5, 21600, "sell price max"],
+      [UbiTokTypes.encodeDirection('Sell'),     500,   2, 18401, "sell price 50.0"],
+      [UbiTokTypes.encodeDirection('Sell'),     123,  -1, 15324, "sell price 0.0123"],
+      [UbiTokTypes.encodeDirection('Sell'),     100,  -2, 14401, "sell price 0.001"],
+      [UbiTokTypes.encodeDirection('Sell'),     999,  -3, 14400, "sell price 0.000999"]
     ];
     var uut;
     return UbiTokExchange.deployed().then(function(instance) {
@@ -141,7 +139,7 @@ contract('UbiTokExchange', function(accounts) {
 });
 
 contract('UbiTokExchange', function(accounts) {
-  var packedBuyOnePointZero = 8100;
+  var packedBuyOnePointZero = 4500;
   it("instantly throws on invalid order id", function() {
     var uut;
     return UbiTokExchange.deployed().then(function(instance) {
@@ -167,13 +165,13 @@ contract('UbiTokExchange', function(accounts) {
 });
 
 contract('UbiTokExchange', function(accounts) {
-  var packedBuyOnePointZero = 8100;
+  var packedBuyOnePointZero = 4500;
   var packedMaxBuyPrice = 1;
   var badOrders = [
     [ 1001, 0, web3.toWei(1, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), "obviously invalid price", "InvalidPrice" ],
     [ 1002, packedBuyOnePointZero, web3.toWei(100, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), "not enough funds", "InsufficientFunds" ],
-    [ 1003, packedBuyOnePointZero, new web3.BigNumber("1e39"), UbiTokTypes.encodeTerms('GoodTillCancel'), "proposterously large base size", "InvalidSize" ],
-    [ 1004, packedMaxBuyPrice, new web3.BigNumber("1e32"), UbiTokTypes.encodeTerms('GoodTillCancel'), "proposterously large quoted size (but base ok)", "InvalidSize" ],
+    [ 1003, packedBuyOnePointZero, new web3.BigNumber("1e39"), UbiTokTypes.encodeTerms('GoodTillCancel'), "preposterously large base size", "InvalidSize" ],
+    [ 1004, packedMaxBuyPrice, new web3.BigNumber("1e35"), UbiTokTypes.encodeTerms('GoodTillCancel'), "preposterously large quoted size (but base ok)", "InvalidSize" ],
     [ 1005, packedBuyOnePointZero, 90, UbiTokTypes.encodeTerms('GoodTillCancel'), "small base size", "InvalidSize" ],
     [ 1006, packedBuyOnePointZero, 900, UbiTokTypes.encodeTerms('GoodTillCancel'), "small quoted size (but base ok)", "InvalidSize" ],
   ];
@@ -557,12 +555,12 @@ contract('UbiTokExchange', function(accounts) {
 });
 
 contract('UbiTokExchange', function(accounts) {
-  var packedBuyOnePointZero = 8100;
+  var packedBuyOnePointZero = 4500;
   var packedMaxBuyPrice = 1;
-  var minSellPricePacked = 16201;
-  var buyFiftyPricePacked = 6800;
-  var buyPoint0123PricePacked = 9877;
-  var sellFiftyPricePacked = 25601;
+  var minSellPricePacked = 10801;
+  var buyFiftyPricePacked = 3200;
+  var buyPoint0123PricePacked = 6277;
+  var sellFiftyPricePacked = 18401;
   it("allows finding first open order from a price", function() {
     var uut;
     return UbiTokExchange.deployed().then(function(instance) {
@@ -574,16 +572,16 @@ contract('UbiTokExchange', function(accounts) {
       return uut.depositBaseForTesting(accounts[0], web3.toWei(100, 'finney'), {from: accounts[0]});
     }).then(function(result) {
       console.log('2');
-      return uut.findFirstOpenOrderFrom.call(packedMaxBuyPrice);
+      return uut.walkBook.call(packedMaxBuyPrice);
     }).then(function(result) {
       console.log('3');
-      assert.equal(result.valueOf(), 0, "no orders in book");
+      assert.equal(result[1].valueOf(), 0, "no orders in book");
     }).then(function(result) {
       console.log('4');
-      return uut.findFirstOpenOrderFrom.call(minSellPricePacked);
+      return uut.walkBook.call(minSellPricePacked);
     }).then(function(result) {
       console.log('5');
-      assert.equal(result.valueOf(), 0, "no orders in book");
+      assert.equal(result[1].valueOf(), 0, "no orders in book");
       return uut.createOrder(1001, buyFiftyPricePacked, web3.toWei(1, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), {from: accounts[0]});
     }).then(function(result) {
       console.log('6');
@@ -592,18 +590,18 @@ contract('UbiTokExchange', function(accounts) {
       console.log('7');
       var state = UbiTokTypes.decodeState(result);
       assert.equal(state.status, "Open", "expected order 1001 to be open");
-      return uut.findFirstOpenOrderFrom.call(packedMaxBuyPrice);
+      return uut.walkBook.call(packedMaxBuyPrice);
     }).then(function(result) {
       console.log('8');
-      assert.equal(result.valueOf(), 1001, "our one buy order should be found since less aggressive than max price");
-      return uut.findFirstOpenOrderFrom.call(minSellPricePacked);
+      assert.equal(result[1].valueOf(), web3.toWei(1, 'finney').valueOf(), "our one buy order should be found since less aggressive than max price");
+      return uut.walkBook.call(minSellPricePacked);
     }).then(function(result) {
       console.log('9');
-      assert.equal(result.valueOf(), 0, "still no sell orders in book");
-      return uut.findFirstOpenOrderFrom.call(buyPoint0123PricePacked);
+      assert.equal(result[1].valueOf(), 0, "still no sell orders in book");
+      return uut.walkBook.call(buyPoint0123PricePacked);
     }).then(function(result) {
       console.log('10');
-      assert.equal(result.valueOf(), 0, "our one buy order should not be found since more aggressive than given from price");
+      assert.equal(result[1].valueOf(), 0, "our one buy order should not be found since more aggressive than given from price");
       return uut.createOrder(1002, buyPoint0123PricePacked, web3.toWei(1000, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), {from: accounts[0]});
     }).then(function(result) {
       console.log('11');
@@ -612,10 +610,10 @@ contract('UbiTokExchange', function(accounts) {
       console.log('12');
       var state = UbiTokTypes.decodeState(result);
       assert.equal(state.status, "Open", "expected order 1002 to be open");
-      return uut.findFirstOpenOrderFrom.call(buyPoint0123PricePacked);
+      return uut.walkBook.call(buyPoint0123PricePacked);
     }).then(function(result) {
       console.log('13');
-      assert.equal(result.valueOf(), 1002, "our 2nd buy order should now be found since equal to given from price");
+      assert.equal(result[1].valueOf(), web3.toWei(1000, 'finney'), "our 2nd buy order should now be found since equal to given from price");
       return uut.createOrder(1003, sellFiftyPricePacked, web3.toWei(3, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), {from: accounts[0]});
     }).then(function(result) {
       console.log('14');
@@ -625,10 +623,10 @@ contract('UbiTokExchange', function(accounts) {
       var state = UbiTokTypes.decodeState(result);
       assert.equal(state.status, "Open", "expected order 1003 to be open");
       assert.equal(state.executedBase.toString(), web3.toWei(1, 'finney'), "expected order 1003 to have executed against order 1001");
-      return uut.findFirstOpenOrderFrom.call(packedMaxBuyPrice);
+      return uut.walkBook.call(packedMaxBuyPrice);
     }).then(function(result) {
       console.log('16');
-      assert.equal(result.valueOf(), 1002, "order 1002 is now the top buy in the book");
+      assert.equal(result[1].valueOf(), web3.toWei(1000, 'finney').valueOf(), "order 1002 is now the top buy in the book");
     });
   });
 });

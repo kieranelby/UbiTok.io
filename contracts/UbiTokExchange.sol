@@ -42,6 +42,7 @@ contract UbiTokExchange {
     uint16 pricePacked;
     uint sizeBase;
     Terms terms;
+    uint128 clientPrevOrderId;
     Status status;
     CancelOrRejectReason cancelOrRejectReason;
     uint executedBase;
@@ -59,20 +60,30 @@ contract UbiTokExchange {
   }
   
   event Debug(string message, address client, uint amount);
+
+  event ClientOrderCreated(address indexed client, uint128 orderId);
+
+  enum MarketOrderEventType {
+    Add,
+    Remove,
+    Trade
+  }
+
+  event MarketOrderEvent(MarketOrderEventType marketOrderEventType, uint128 orderId, uint16 pricePacked, uint amountBase);
   
-  int8 public minimumPriceExponent = -8;
+  int8 public minimumPriceExponent = -6;
   
   string public baseTradableSymbol = 'UBI';
   uint public baseTradableDisplayDecimals = 18;
   TradableType public baseTradableType = TradableType.ERC20;
-  uint public baseMinInitialSize = 10; // yes, far too small - testing only!
-  uint public baseMinRemainingSize = 100;
+  uint public baseMinInitialSize = 100; // yes, far too small - testing only!
+  uint public baseMinRemainingSize = 10;
 
   string public quotedTradableSymbol = 'ETH';
   uint public quotedTradableDisplayDecimals = 18;
   TradableType public quotedTradableType = TradableType.Ether;
-  uint public quotedMinInitialSize = 1000; // yes, far too small - testing only!
-  uint public quotedMinRemainingSize = 10000;
+  uint public quotedMinInitialSize = 10000; // yes, far too small - testing only!
+  uint public quotedMinRemainingSize = 1000;
 
   mapping (address => uint) balanceBaseForClient;
   mapping (address => uint) balanceQuotedForClient;
@@ -80,15 +91,22 @@ contract UbiTokExchange {
   mapping (uint128 => Order) orderForOrderId;
   
   // Effectively a compact mapping from uint16 pricePacked to bool occupied.
-  // See explanation of our price packing above the packPrice function as to why 127.
+  // See explanation of our price packing above the packPrice function as to why 85.
   // By occupied we mean "a chain of one or more open orders currently exist at this price level".
 
-  uint256[127] occupiedPricePackedBitmaps;
+  uint256[85] occupiedPricePackedBitmaps;
 
   // These allow us to walk over the orders in the book at a given price level (and add more).
 
   mapping (uint16 => OrderChain) orderChainForOccupiedPricePacked;
   mapping (uint128 => OrderChainNode)  orderChainNodeForOpenOrderId;
+
+  // These allow a client to (reasonably) efficiently find their own orders
+  // without relying on events (which even indexed are a bit expensive to search
+  // through months of blocks).
+
+  mapping (address => uint128) public mostRecentOrderIdForClient;
+  mapping (uint128 => uint128) clientPreviousOrderIdBeforeOrderId;
 
   function UbiTokExchange() {
   }
@@ -113,9 +131,9 @@ contract UbiTokExchange {
 
   // Public Order View.
   //
-  function getOrder(uint128 orderId) public constant returns (address client, uint16 pricePacked, uint sizeBase, Terms terms) {
+  function getOrder(uint128 orderId) public constant returns (address client, uint16 pricePacked, uint sizeBase, Terms terms, uint128 clientPrevOrderId) {
     Order order = orderForOrderId[orderId];
-    return (order.client, order.pricePacked, order.sizeBase, order.terms);
+    return (order.client, order.pricePacked, order.sizeBase, order.terms, order.clientPrevOrderId);
   }
 
   // Public Order View.
@@ -133,30 +151,28 @@ contract UbiTokExchange {
   //
   //   direction - invalid / buy / sell
   //   mantissa - ranges from 100 to 999 representing 0.100 to 0.999
-  //   exponent - ranges from minimumPriceExponent to minimumPriceExponent + 17
-  //              (e.g. -8 to +9 for a typical pair where minimumPriceExponent = -8)
+  //   exponent - ranges from minimumPriceExponent to minimumPriceExponent + 11
+  //              (e.g. -6 to +5 for a typical pair where minimumPriceExponent = -6)
   //
   // The packed representation has 32001 different price values:
   //
   //      0  = invalid (can be used as marker value)
   //      1  = buy at maximum price (0.999 * 10 ** 9)
   //    ...  = other buy prices in descending order
-  //  16200  = buy at minimum price (0.100 * 10 ** -8)
-  //  16201  = sell at minimum price (0.100 * 10 ** -8)
+  //  10800  = buy at minimum price (0.100 * 10 ** -8)
+  //  10801  = sell at minimum price (0.100 * 10 ** -8)
   //    ...  = other sell prices in descending order
-  //  32400  = sell at maximum price (0.999 * 10 ** 9)
-  //  32401+ = do not use
+  //  21600  = sell at maximum price (0.999 * 10 ** 9)
+  //  21601+ = do not use
   //
   // If we want to map each packed price to a boolean value (which we do),
-  // we require 127 256-bit words. Or 63.5 for each side of the book.
-  //
-  // TODO - This is still too expensive, perhaps reduce exponent range to -5 to +6 ..?
+  // we require 85 256-bit words. Or 42.5 for each side of the book.
   
   uint constant invalidPricePacked = 0;
   uint constant maxBuyPricePacked = 1;
-  uint constant minBuyPricePacked = 16200;
-  uint constant minSellPricePacked = 16201;
-  uint constant maxSellPricePacked = 32400;
+  uint constant minBuyPricePacked = 10800;
+  uint constant minSellPricePacked = 10801;
+  uint constant maxSellPricePacked = 21600;
   
   // Public Price Calculation.
   //
@@ -164,7 +180,7 @@ contract UbiTokExchange {
     if (direction == Direction.Invalid) {
       return 0;
     }
-    if (exponent < minimumPriceExponent || exponent > minimumPriceExponent + 17) {
+    if (exponent < minimumPriceExponent || exponent > minimumPriceExponent + 11) {
       return 0;
     }
     if (mantissa < 100 || mantissa > 999) {
@@ -173,7 +189,7 @@ contract UbiTokExchange {
     uint zeroBasedExponent = uint(exponent - minimumPriceExponent);
     uint zeroBasedMantissa = uint(mantissa - 100);
     uint priceIndex = zeroBasedExponent * 900 + zeroBasedMantissa;
-    uint sidedPriceIndex = (direction == Direction.Buy) ? 16200 - priceIndex : 16201 + priceIndex;
+    uint sidedPriceIndex = (direction == Direction.Buy) ? minBuyPricePacked - priceIndex : minSellPricePacked + priceIndex;
     return uint16(sidedPriceIndex);
   }
 
@@ -182,17 +198,17 @@ contract UbiTokExchange {
   function unpackPrice(uint16 pricePacked) public constant returns (Direction direction, uint16 mantissa, int8 exponent) {
     uint sidedPriceIndex = uint(pricePacked);
     uint priceIndex;
-    if (sidedPriceIndex < 1 || sidedPriceIndex > 32400) {
+    if (sidedPriceIndex < 1 || sidedPriceIndex > maxSellPricePacked) {
       direction = Direction.Invalid;
       mantissa = 0;
       exponent = 0;
       return;
-    } else if (sidedPriceIndex <= 16200) {
+    } else if (sidedPriceIndex <= minBuyPricePacked) {
       direction = Direction.Buy;
-      priceIndex = 16200 - sidedPriceIndex;
+      priceIndex = minBuyPricePacked - sidedPriceIndex;
     } else {
       direction = Direction.Sell;
-      priceIndex = sidedPriceIndex - 16201;
+      priceIndex = sidedPriceIndex - minSellPricePacked;
     }
     uint zeroBasedMantissa = priceIndex % 900;
     uint zeroBasedExponent = priceIndex / 900;
@@ -261,7 +277,10 @@ contract UbiTokExchange {
       // Can't return graceful error here - nowhere to store the reject reason.
       throw;
     }
-    orderForOrderId[orderId] = Order(client, pricePacked, sizeBase, terms, Status.Unknown, CancelOrRejectReason.None, 0, 0);
+    ClientOrderCreated(client, orderId);
+    uint128 previousMostRecentOrderIdForClient = mostRecentOrderIdForClient[client];
+    orderForOrderId[orderId] = Order(client, pricePacked, sizeBase, terms, previousMostRecentOrderIdForClient, Status.Unknown, CancelOrRejectReason.None, 0, 0);
+    mostRecentOrderIdForClient[client] = orderId;
     Order order = orderForOrderId[orderId];
     var (direction, mantissa, exponent) = unpackPrice(pricePacked);
     if (direction == Direction.Invalid) {
@@ -546,7 +565,7 @@ contract UbiTokExchange {
     } else {
       matchStopReason = MatchStopReason.None;
     }
-    bool theirsDead = recordTheirMatch(theirOrder, theirPricePacked, matchBase, matchQuoted);
+    bool theirsDead = recordTheirMatch(theirOrder, theirOrderId, theirPricePacked, matchBase, matchQuoted);
     if (theirsDead) {
       nextTheirOrderId = orderChainNodeForOpenOrderId[theirOrderId].nextOrderId;
       if (matchStopReason == MatchStopReason.None && nextTheirOrderId == 0) {
@@ -567,9 +586,10 @@ contract UbiTokExchange {
   //
   // No sanity checks are made - the caller must be sure the order is not already done and has sufficient remaining.
   //
-  function recordTheirMatch(Order storage theirOrder, uint16 theirPricePacked, uint matchBase, uint matchQuoted) internal returns (bool theirsDead) {
+  function recordTheirMatch(Order storage theirOrder, uint128 theirOrderId, uint16 theirPricePacked, uint matchBase, uint matchQuoted) internal returns (bool theirsDead) {
     theirOrder.executedBase += matchBase;
     theirOrder.executedQuoted += matchQuoted;
+    MarketOrderEvent(MarketOrderEventType.Trade, theirOrderId, theirPricePacked, matchBase);
     if (isBuyPrice(theirPricePacked)) {
       // they have bought base (using the quoted they already paid when creating the order)
       Debug("maker got base", theirOrder.client, matchBase);
@@ -636,6 +656,7 @@ contract UbiTokExchange {
       existingLastOrderChainNode.nextOrderId = orderId;
       orderChain.lastOrderId = orderId;
     }
+    MarketOrderEvent(MarketOrderEventType.Add, orderId, pricePacked, order.sizeBase - order.executedBase);
     order.status = Status.Open;
   }
 
@@ -663,17 +684,31 @@ contract UbiTokExchange {
     }
   }
 
-  // Intended for public book depth enumeration.
+  // Intended for public book depth enumeration from web3 (or similar).
+  // Not suitable for use from a smart contract transaction - gas usage
+  // could be very high if we have many orders at the same price.
   //
-  // Search for the first open order with the given direction in descending
-  // order of their aggressiveness, starting at the given price.
+  // Start at the given price (and side) and walk down the book (getting
+  // less aggressive) until we find some open orders or reach the least
+  // aggressive price.
   //
-  // Returns the order id of the order found, or zero if there are no open orders of the given
-  // direction with a price equal to or less aggressive than the given price.
+  // Returns the price where we found the order(s), the depth at that
+  // price (zero if none found), and the current blockNumber.
   //
-  function findFirstOpenOrderFrom(uint16 pricePacked) public constant returns (uint128 orderId) {
-    var (direction,) = unpackPrice(pricePacked);
-    uint pricePackedStart = pricePacked;
+  // (The blockNumber is handy if you're taking a snapshot which you intend
+  //  to keep up-to-date with the market order events).
+  //
+  // To walk the book, the caller should start by calling walkBook with the
+  // most aggressive buy price. If the price returned is the least aggressive
+  // buy price, the side is complete. Otherwise, call walkBook again with the
+  // price returned + 1. Then repeat for the sell side.
+  //
+  function walkBook(uint16 fromPricePacked) public constant returns (uint16 pricePacked, uint depthBase, uint blockNumber) {
+    var (direction,) = unpackPrice(fromPricePacked); // TODO - inefficient
+    if (direction == Direction.Invalid) {
+      return (0, 0, 0);
+    }
+    uint pricePackedStart = fromPricePacked;
     uint pricePackedEnd = (direction == Direction.Buy) ? minBuyPricePacked : maxSellPricePacked;
     
     uint bmi = pricePackedStart / 256;
@@ -691,7 +726,8 @@ contract UbiTokExchange {
       } else {
         if ((wbm & 1) != 0) {
           // careful - copy-pasted in below loop
-          return orderChainForOccupiedPricePacked[uint16(bmi * 256 + bti)].firstOrderId;
+          pricePacked = uint16(bmi * 256 + bti);
+          return (pricePacked, sumDepth(orderChainForOccupiedPricePacked[pricePacked].firstOrderId), block.number);
         }
         bti += 1;
         wbm /= 2;
@@ -700,29 +736,27 @@ contract UbiTokExchange {
     while (bti <= btiEnd && wbm != 0) {
       if ((wbm & 1) != 0) {
         // careful - copy-pasted in above loop
-        return orderChainForOccupiedPricePacked[uint16(bmi * 256 + bti)].firstOrderId;
+        pricePacked = uint16(bmi * 256 + bti);
+        return (pricePacked, sumDepth(orderChainForOccupiedPricePacked[pricePacked].firstOrderId), block.number);
       }
       bti += 1;
       wbm /= 2;
     }
-    return 0;
+    return (uint16(pricePackedEnd), 0, block.number);
   }
 
-  // Intended for public book depth enumeration.
+  // See walkBook - adds up open depth at a price starting from an order which is assumed to be open.
   //
-  // Find the next (lower priority / newer) open order after the given open order at the same price and direction.
-  //
-  // Returns either:
-  //  isStillOpen = false if the given order is not open (in which case nextOrderId is meaningless).
-  //  isStillOpen = true if the given order is open, in which case nextOrderId is the order id of the
-  //                next order - or zero if there is no next order at the same price and direction.
-  //
-  function nextOpenOrderFrom(uint128 orderId) public constant returns (bool isStillOpen, uint128 nextOrderId) {
-    Order order = orderForOrderId[orderId];
-    if (order.status != Status.Open) {
-      return (false, 0);
+  function sumDepth(uint128 orderId) internal constant returns (uint depth) {
+    depth = 0;
+    while (true) {
+      Order order = orderForOrderId[orderId];
+      depth += order.sizeBase - order.executedBase;
+      orderId = orderChainNodeForOpenOrderId[orderId].nextOrderId;
+      if (orderId == 0) {
+        return;
+      }
     }
-    return (true, orderChainNodeForOpenOrderId[orderId].nextOrderId);
   }
   
 }

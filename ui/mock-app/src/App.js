@@ -1,15 +1,17 @@
 import React, { Component } from 'react';
-import { Navbar, Nav, NavItem, Tab, Tabs, Well,
+import { Navbar, Nav, NavItem, Tab, Tabs, Well, Panel,
          Grid, Row, Col, Table,
          ButtonToolbar, Button, Glyphicon, 
          FormGroup, FormControl, ControlLabel, HelpBlock } from 'react-bootstrap';
 import update from 'immutability-helper';
 
 import logo from './ubitok-logo.svg';
+import metamaskLogo from './metamask.png';
+import mistLogo from './mist.png';
 //import mockPriceChart from './mock-price-chart.svg';
 import './App.css';
 
-import Web3 from 'web3';
+import Bridge from './bridge.js'
 
 // Work around for:
 // a) passing Nav props into a form element
@@ -19,136 +21,31 @@ function MyNavForm(props) {
   return <form className="navbar-form" id={props.id}>{props.children}</form>
 }
 
-class Bridge {
-
-  constructor(bookContractAddress) {
-    this.ready = false;
-    this.bookContractAddress = bookContractAddress;
-    window.setTimeout(this.pollForWeb3, 1000);
-  }
-
-  pollForWeb3 = () => {
-    if (this.ready) {
-      return;
-    }
-    if (typeof window.web3 !== 'undefined') {
-      // Use Mist/MetaMask's provider
-      console.log('found web3');
-      this.web3 = new Web3(window.web3.currentProvider);
-      var abiArray = [{"constant":true,"inputs":[],"name":"baseTradableType","outputs":[{"name":"","type":"uint8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"pricePacked","type":"uint16"}],"name":"unpackPrice","outputs":[{"name":"direction","type":"uint8"},{"name":"mantissa","type":"uint16"},{"name":"exponent","type":"int8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"orderId","type":"uint128"}],"name":"getOrder","outputs":[{"name":"client","type":"address"},{"name":"pricePacked","type":"uint16"},{"name":"sizeBase","type":"uint256"},{"name":"terms","type":"uint8"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"client","type":"address"},{"name":"amountQuoted","type":"uint256"}],"name":"depositQuotedForTesting","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseMinInitialSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedTradableDisplayDecimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"orderId","type":"uint128"}],"name":"getOrderState","outputs":[{"name":"status","type":"uint8"},{"name":"cancelOrRejectReason","type":"uint8"},{"name":"executedBase","type":"uint256"},{"name":"executedQuoted","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseMinRemainingSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"orderId","type":"uint128"}],"name":"nextOpenOrderFrom","outputs":[{"name":"isStillOpen","type":"bool"},{"name":"nextOrderId","type":"uint128"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"pricePacked","type":"uint16"}],"name":"oppositePackedPrice","outputs":[{"name":"","type":"uint16"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"minimumPriceExponent","outputs":[{"name":"","type":"int8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"client","type":"address"}],"name":"getClientBalances","outputs":[{"name":"balanceBase","type":"uint256"},{"name":"balanceQuoted","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedMinRemainingSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"baseAmount","type":"uint256"},{"name":"mantissa","type":"uint16"},{"name":"exponent","type":"int8"}],"name":"computeQuotedAmount","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"baseAmount","type":"uint256"},{"name":"pricePacked","type":"uint16"}],"name":"computeQuotedAmountUsingPacked","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"direction","type":"uint8"},{"name":"mantissa","type":"uint16"},{"name":"exponent","type":"int8"}],"name":"packPrice","outputs":[{"name":"","type":"uint16"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"client","type":"address"},{"name":"amountBase","type":"uint256"}],"name":"depositBaseForTesting","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"pricePacked","type":"uint16"}],"name":"findFirstOpenOrderFrom","outputs":[{"name":"orderId","type":"uint128"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"orderId","type":"uint128"},{"name":"pricePacked","type":"uint16"},{"name":"sizeBase","type":"uint256"},{"name":"terms","type":"uint8"}],"name":"createOrder","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedMinInitialSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseTradableSymbol","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedTradableType","outputs":[{"name":"","type":"uint8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"validPricePacked","type":"uint16"}],"name":"isBuyPrice","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseTradableDisplayDecimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedTradableSymbol","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function"},{"inputs":[],"payable":false,"type":"constructor"},{"anonymous":false,"inputs":[{"indexed":false,"name":"message","type":"string"},{"indexed":false,"name":"client","type":"address"},{"indexed":false,"name":"amount","type":"uint256"}],"name":"Debug","type":"event"}];
-      var BookContract = this.web3.eth.contract(abiArray);
-      this.bookContract = BookContract.at(this.bookContractAddress);
-      this.ready = true;
-    } else {
-      console.log('No web3? You should consider trying MetaMask! Perhaps if we wait it will be injected ...');
-    }
-    window.setTimeout(this.pollForWeb3, 1000);
-  }
-
-  subscribeNetworkAndAccountInfo(callback) {
-      
-  }
-
-  checkReady(callbackIfNot) {
-    if (!this.ready) {
-      window.setTimeout(function () { callbackIfNot(new Error('not ready'))}, 0);
-    }
-    return this.ready;
-  }
-
-  getExchangeBalances(callback) {
-    if (!this.checkReady(callback)) {
-      return;
-    }
-    this.bookContract.getClientBalances.call(this.web3.eth.accounts[0], callback);
-  }
-
-    getErc20Balance(erc20addr, callback) {
-
-    }
-
-    getErc20Approved(erc20addr, callback) {
-
-    }
-
-    getEtherBalance(callback) {
-
-    }
-
-    submitCounterEtherDeposit (amount, callback) {
-
-    }
-
-    submitErc20Approve (erc20addr, amount, callback) {
-
-    }
-
-    submitErc20Unapprove (erc20addr, amount, callback) {
-
-    }
-
-    submitBaseErc20Deposit ( amount, callback ) {
-
-    }
-
-    submitCounterEtherWithdraw ( amount, callback ) {
-
-    }
-
-    submitBaseErc20Withdraw ( amount, callback ) {
-
-    }
-
-    getBookDepthStart (side, callback) {
-
-    }
-
-    getBookDepthNext (continueFrom, callback) {
-
-    }
-
-    submitCreateOrder (orderId, price, sizeBase, terms, callback) {
-
-    }
-    
-    submitContinueOrder (orderId, callback) {
-
-    }
-
-    submitCancelOrder (orderId, callback) {
-
-    }
-
-    getOrder(orderId, callback) {
-
-    }
-
-    getOrderStatus(orderId, callback) {
-
-    }
-
-    getAllOrderIdsFor(client, fromBlock, callback) {
-
-    }
-
-    getAllMarketEvents(fromBlock, toBlock, callback) {
-
-    }
-
-    subscribeAllMarketEvents(fromBlock, callback) {
-
-    }
-
-}
-
 class App extends Component {
   constructor(props) {
     super(props);
-    this.bridge = new Bridge('0x7b4814c3582f612e6f0640ef233d77e758539c14');
+    // should be per-network, perhaps we do need a depth query
+    this.lastBookSnapshot = {
+      blockId: 100000,
+      depthByPrice: {}
+    };
+    this.bridge = new Bridge();
+    this.lastBridgeStatus = this.bridge.getUpdatedStatus();
     this.state = {
-      // where are we?
+      // who and where are we?
       "app": {
         "siteName": "UbiTok.io"
+      },
+      "bridgeStatus": {
+        web3Present: false,
+        chosenSupportedNetworkName: undefined,
+        unsupportedNetwork: false,
+        networkChanged: false,
+        chosenAccount: undefined,
+        accountLocked: false,
+        accountChanged: false,
+        canMakePublicCalls: false,
+        canMakeAccountCalls: false
       },
       // what are we trading?
       "pairInfo": {
@@ -272,7 +169,64 @@ class App extends Component {
         ]
       }
     };
+    this.bridge.subscribeStatus(this.handleStatusUpdate);
     window.setInterval(this.pollExchangeBalances, 2000);
+  }
+  handleStatusUpdate = (error, newBridgeStatus) => {
+    let oldStatus = this.lastBridgeStatus;
+    if (!oldStatus.canMakePublicCalls && newBridgeStatus.canMakePublicCalls) {
+      this.readPublicData();
+    }
+    if (!oldStatus.canMakeAccountCalls && newBridgeStatus.canMakeAccountCalls) {
+      this.readAccountData();
+    }
+    this.lastBridgeStatus = newBridgeStatus;
+    this.setState((prevState, props) => {
+      return {
+        bridgeStatus: newBridgeStatus
+      }
+    });
+  }
+  readPublicData = () => {
+    this.bridge.walkBook(1, this.handleWalkBook);
+  }
+  readAccountData = () => {
+    this.bridge.getAllOrderIds(this.handleHistoricClientOrderCreated);
+  }
+  handleWalkBook = (error, result) => {
+    console.log('handleWalkBook', error, result);
+    if (error) {
+      this.panic(error);
+      return;
+    }
+    var pricePacked = result[0].valueOf();
+    var depth = result[1];
+    var blockNumber = result[2].valueOf();
+    var nextPricePacked;
+    var done = false;
+    if (!depth.isZero()) {
+      console.log('found depth', depth.valueOf(), pricePacked.valueOf());
+      if (pricePacked === 32400) {
+        done = true;
+      } else {
+        nextPricePacked = pricePacked + 1;
+      }
+    } else {
+      if (pricePacked <= 16200) {
+        nextPricePacked = 16201;
+      } else {
+        done = true;
+      }
+    }
+    if (!done) {
+      this.bridge.walkBook(nextPricePacked, this.handleWalkBook);
+    }
+  }
+  handleHistoricClientOrderCreated = (error, result) => {
+    console.log('handleHistoricClientOrderCreated', error, result);
+  }
+  handleHistoricMarketEvents = (error, result) => {
+    console.log('handleHistoricMarketEvents', error, result);
   }
   pollExchangeBalances = () => {
     this.bridge.getExchangeBalances(function (error, newClientBalances) {
@@ -310,16 +264,47 @@ class App extends Component {
   handleCreateOrderBuyAmountBaseChange = (e) => {
     var v = e.target.value;
     this.setState((prevState, props) => {
-      // TODO - wrong but working by accident!
-      prevState.createOrder.buy.amountBase = v;
+      return {
+        createOrder: update(prevState.createOrder, {
+          buy: { amountBase: { $set: v } }
+        })
+      };
     });
   }
   handleCreateOrderBuyPriceChange = (e) => {
     var v = e.target.value;
     this.setState((prevState, props) => {
-      // TODO - wrong but working by accident!
-      prevState.createOrder.buy.price = v;
+      return {
+        createOrder: update(prevState.createOrder, {
+          buy: { price: { $set: v } }
+        })
+      };
     });
+  }
+  handlePlaceBuyOrder = (e) => {
+    var orderId = "" + new Date().valueOf();
+    //submitCreateOrder (orderId, price, sizeBase, terms, callback)
+    this.bridge.submitCreateOrder(orderId, 8000, this.state.createOrder.buy.amountBase, 0, this.handlePlaceBuyOrderCallback);
+    var newOrder = {
+            "orderId": orderId,
+            "price": "Buy @ 2.0",
+            "sizeBase": this.state.createOrder.buy.amountBase,
+            "terms": "GoodTillCancel",
+            "status": "New",
+            "cancelOrRejectReason": "None",
+            "executedBase": "0",
+            "executedQuoted": "0"
+          }
+    this.setState((prevState, props) => {
+      return {
+        myOrders: update(prevState.myOrders, {
+          orders: { $push: [newOrder] }
+        })
+      };
+    });
+  }
+  handlePlaceBuyOrderCallback = (error, result) => {
+    console.log('might have placed an order', error, result);
   }
   
   render() {
@@ -329,24 +314,80 @@ class App extends Component {
           <img src={logo} className="App-logo" alt="UbiTok.io" /> the unstoppable Ethereum token exchange
         </div>
           <Grid>
-          <Row>
-          <Navbar inverse>
-            <Nav>
-              <MyNavForm id="productSelectForm">
-                <FormGroup controlId="productSelect">
-                  <FormControl componentClass="select" placeholder="Choose product">
-                    <option value="UBI/ETH">Product: UBI/ETH</option>
-                  </FormControl>
-                </FormGroup>
-              </MyNavForm>
-            </Nav>
-            <Nav bsStyle="pills" activeKey={2} onSelect={this.handleNavSelect} pullRight>
-              <NavItem eventKey={1} href="#">Home</NavItem>
-              <NavItem eventKey={2} href="#">Exchange</NavItem>
-              <NavItem eventKey={3} href="#">Help</NavItem>
-            </Nav>
-          </Navbar>
-          </Row>
+            <Row>
+              <Navbar inverse>
+                <Nav>
+                  <MyNavForm id="productSelectForm">
+                    <FormGroup controlId="productSelect">
+                      <FormControl componentClass="select" placeholder="Choose product">
+                        <option value="UBI/ETH">Product: UBI/ETH</option>
+                      </FormControl>
+                    </FormGroup>
+                  </MyNavForm>
+                </Nav>
+                <Nav bsStyle="pills" activeKey={2} onSelect={this.handleNavSelect} pullRight>
+                  <NavItem eventKey={1} href="#">Home</NavItem>
+                  <NavItem eventKey={2} href="#">Exchange</NavItem>
+                  <NavItem eventKey={3} href="#">Help</NavItem>
+                </Nav>
+              </Navbar>
+            </Row>
+            <Row>
+              <Col md={12}>
+                {!this.state.bridgeStatus.web3Present ? (
+                <Panel header="No Ethereum Connection" bsStyle="danger">
+                  <p>UbiTok.io needs to connect to the Ethereum network via a local client, but could not find one.</p>
+                  <p>We suggest using one of the following clients to connect to Ethereum:</p>
+                  <Row>
+                      <Col sm={6}>
+                          <a href="https://metamask.io/" target="_blank">
+                            <h4>Metamask Chrome Extension</h4>
+                            <img src={metamaskLogo} className="Metamask-logo" alt="Metamask" />
+                          </a>
+                      </Col>
+                      <Col sm={6}>
+                          <a href="https://github.com/ethereum/mist/releases" target="_blank">
+                            <h4>Mist Browser</h4>
+                            <img src={mistLogo} className="Mist-logo" alt="Mist" />
+                          </a>
+                      </Col>
+                  </Row>
+                </Panel>
+                ) : this.state.bridgeStatus.unsupportedNetwork ? (
+                <Panel header="Unsupported Ethereum Network" bsStyle="danger">
+                  <p>UbiTok.io is currently only available on the Ropsten Test Network.</p>
+                  <p>Try changing Ethereum Network in your Ethereum Client (e.g. Metamask, Mist).</p>
+                </Panel>
+                ) : this.state.bridgeStatus.networkChanged ? (
+                <Panel header="Ethereum Network Changed" bsStyle="danger">
+                  <p>You seem to have changed Ethereum Network.</p>
+                  <p>Try changing Ethereum Network in your Ethereum Client (e.g. Metamask, Mist)
+                     back to {this.state.bridgeStatus.chosenSupportedNetworkName}, or reload this page to pick up the new network.</p>
+                </Panel>
+                ) : this.state.bridgeStatus.accountLocked ? (
+                <Panel header="Ethereum Account Locked" bsStyle="danger">
+                  <p>UbiTok.io needs to know which Ethereum account to use.</p>
+                  <p>Try unlocking your Ethereum Client (e.g. Metamask, Mist).</p>
+                </Panel>
+                ) : this.state.bridgeStatus.accountChanged ? (
+                <Panel header="Ethereum Account Changed" bsStyle="danger">
+                  <p>You seem to have changed Ethereum Account.</p>
+                  <p>Try changing Ethereum Account in your Ethereum Client (e.g. Metamask, Mist)
+                     back to {this.state.bridgeStatus.chosenAccount}, or reload this page to pick up the new account.</p>
+                </Panel>
+                ) : (!this.state.bridgeStatus.canMakePublicCalls || !this.state.bridgeStatus.canMakeAccountCalls) ? (
+                <Panel header="Unknown Ethereum Connection Problem" bsStyle="danger">
+                  <p>Some unusual problem has occurred preventing UbiTok.io connecting to the Ethereum Network.</p>
+                  <p>Try reloading this page, or contact help@ubitok.io with details of the problem.</p>
+                </Panel>
+                ) : (
+                <Well bsSize="small">
+                  <Glyphicon glyph="info-sign" title="Ethereum Connection Info" />
+                  &nbsp;Using Ethereum Account {this.state.bridgeStatus.chosenAccount} on {this.state.bridgeStatus.chosenSupportedNetworkName}.
+                </Well>
+                )}
+              </Col>
+            </Row>
             <Row>
               <Col md={4}>
                 <h3>{this.state.pairInfo.symbol} Info</h3>
@@ -522,7 +563,7 @@ class App extends Component {
                     </FormGroup>
                     <FormGroup>
                       <ButtonToolbar>
-                        <Button bsStyle="primary">
+                        <Button bsStyle="primary" onClick={this.handlePlaceBuyOrder}>
                           Place Buy Order
                         </Button>
                       </ButtonToolbar>

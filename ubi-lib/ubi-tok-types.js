@@ -35,7 +35,7 @@ var enumTerms = [
 
 function encodeEnum(enumNamedValues, namedValue) {
   var idx = enumNamedValues.indexOf(namedValue);
-  if (idx == -1) {
+  if (idx === -1) {
     throw new Error("unknown name " + namedValue + " expected one of " + enumNamedValues);
   }
   return idx;
@@ -54,11 +54,11 @@ exports.encodeDirection = function (directionName) {
 };
 
 exports.oppositeEncodedDirection = function(encodedDirection) {
-  if (encodedDirection == 0) {
+  if (encodedDirection === 0) {
     return 0;
-  } else if (encodedDirection == 1) {
+  } else if (encodedDirection === 1) {
     return 2;
-  } else if (encodedDirection == 2) {
+  } else if (encodedDirection === 2) {
     return 1;
   } else {
     throw new Error("unknown encodedDirection " + encodedDirection)
@@ -95,16 +95,16 @@ exports.encodePrice = function (friendlyPrice) {
   if (direction === 'Invalid') {
      return 0;
   }
-  if (exponent < -8 || exponent > 9) {
+  if (exponent < -6 || exponent > 5) {
     return 0;
   }
   if (mantissa < 100 || mantissa > 999) {
     return 0;
   }
-  var zeroBasedExponent = exponent + 8;
+  var zeroBasedExponent = exponent + 6;
   var zeroBasedMantissa = mantissa - 100;
   var priceIndex = zeroBasedExponent * 900 + zeroBasedMantissa;
-  var sidedPriceIndex = (direction === 'Buy') ? 16200 - priceIndex : 16201 + priceIndex;
+  var sidedPriceIndex = (direction === 'Buy') ? 10800 - priceIndex : 10801 + priceIndex;
   console.log(friendlyPrice, "=>", direction, mantissa, exponent, "=>", sidedPriceIndex);
   return sidedPriceIndex;
 };

@@ -1,0 +1,201 @@
+
+import Web3 from 'web3';
+import UbiTokTypes from 'ubi-lib/ubi-tok-types.js';
+
+export default class {
+
+  constructor() {
+    this.web3 = undefined;
+    this.chosenSupportedNetworkId = undefined;
+    this.chosenSupportedNetworkName = undefined;
+    this.chosenAccount = undefined;
+    this.supportedNetworks = {
+        "3": {
+            name: "Ropsten Test Network",
+            bookContractAddress: "0xeacaf5265fb6b253ce5d93fd197361a190be20d3"
+        }
+    };
+    this.statusSubscribers = [];
+    window.setTimeout(this.pollStatus, 1000);
+  }
+
+  pollStatus = () => {
+    let status = this.getUpdatedStatus();
+    for (let subscriber of this.statusSubscribers) {
+      subscriber(undefined, status);
+    }
+    window.setTimeout(this.pollStatus, 1000);
+  }
+
+  getUpdatedStatus = () => {
+    if (this.web3 === undefined && window.web3) {
+      console.log('found web3 provider');
+      this.web3 = new Web3(window.web3.currentProvider);
+    }
+    let web3Present = this.web3 !== undefined && this.web3.hasOwnProperty("version");
+    let networkId = web3Present ? this.web3.version.network : undefined;
+    let unsupportedNetwork = web3Present && !this.supportedNetworks.hasOwnProperty(networkId);
+    if (web3Present && this.chosenSupportedNetworkId === undefined && !unsupportedNetwork) {
+      console.log('choosing network', networkId);
+      this.chosenSupportedNetworkId = networkId;
+      let networkSettings = this.supportedNetworks[networkId];
+      this.chosenSupportedNetworkName = networkSettings.name;
+      let bookContractAddress = networkSettings.bookContractAddress;
+      const abiArray = 
+          [{"constant":true,"inputs":[{"name":"fromPricePacked","type":"uint16"}],"name":"walkBook","outputs":[{"name":"pricePacked","type":"uint16"},{"name":"depthBase","type":"uint256"},{"name":"blockNumber","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseTradableType","outputs":[{"name":"","type":"uint8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"pricePacked","type":"uint16"}],"name":"unpackPrice","outputs":[{"name":"direction","type":"uint8"},{"name":"mantissa","type":"uint16"},{"name":"exponent","type":"int8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"orderId","type":"uint128"}],"name":"getOrder","outputs":[{"name":"client","type":"address"},{"name":"pricePacked","type":"uint16"},{"name":"sizeBase","type":"uint256"},{"name":"terms","type":"uint8"},{"name":"clientPrevOrderId","type":"uint128"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"client","type":"address"},{"name":"amountQuoted","type":"uint256"}],"name":"depositQuotedForTesting","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseMinInitialSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedTradableDisplayDecimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"orderId","type":"uint128"}],"name":"getOrderState","outputs":[{"name":"status","type":"uint8"},{"name":"cancelOrRejectReason","type":"uint8"},{"name":"executedBase","type":"uint256"},{"name":"executedQuoted","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseMinRemainingSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"pricePacked","type":"uint16"}],"name":"oppositePackedPrice","outputs":[{"name":"","type":"uint16"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"minimumPriceExponent","outputs":[{"name":"","type":"int8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"client","type":"address"}],"name":"getClientBalances","outputs":[{"name":"balanceBase","type":"uint256"},{"name":"balanceQuoted","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"","type":"address"}],"name":"mostRecentOrderIdForClient","outputs":[{"name":"","type":"uint128"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedMinRemainingSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"baseAmount","type":"uint256"},{"name":"mantissa","type":"uint16"},{"name":"exponent","type":"int8"}],"name":"computeQuotedAmount","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"baseAmount","type":"uint256"},{"name":"pricePacked","type":"uint16"}],"name":"computeQuotedAmountUsingPacked","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"direction","type":"uint8"},{"name":"mantissa","type":"uint16"},{"name":"exponent","type":"int8"}],"name":"packPrice","outputs":[{"name":"","type":"uint16"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"client","type":"address"},{"name":"amountBase","type":"uint256"}],"name":"depositBaseForTesting","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"orderId","type":"uint128"},{"name":"pricePacked","type":"uint16"},{"name":"sizeBase","type":"uint256"},{"name":"terms","type":"uint8"}],"name":"createOrder","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedMinInitialSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseTradableSymbol","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedTradableType","outputs":[{"name":"","type":"uint8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"validPricePacked","type":"uint16"}],"name":"isBuyPrice","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseTradableDisplayDecimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedTradableSymbol","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function"},{"inputs":[],"payable":false,"type":"constructor"},{"anonymous":false,"inputs":[{"indexed":false,"name":"message","type":"string"},{"indexed":false,"name":"client","type":"address"},{"indexed":false,"name":"amount","type":"uint256"}],"name":"Debug","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"client","type":"address"},{"indexed":false,"name":"orderId","type":"uint128"}],"name":"ClientOrderCreated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"marketOrderEventType","type":"uint8"},{"indexed":false,"name":"orderId","type":"uint128"},{"indexed":false,"name":"pricePacked","type":"uint16"},{"indexed":false,"name":"amountBase","type":"uint256"}],"name":"MarketOrderEvent","type":"event"}]
+      ;
+      let BookContract = this.web3.eth.contract(abiArray);
+      this.bookContract = BookContract.at(bookContractAddress);
+    }
+    let networkChanged = web3Present && this.chosenSupportedNetworkId !== undefined && networkId !== this.chosenSupportedNetworkId;
+    var firstAccount = web3Present ? this.web3.eth.accounts[0] : undefined;
+    let accountLocked = web3Present && firstAccount === undefined; // TODO - perhaps check not all zeroes?
+    if (web3Present && this.chosenAccount === undefined && !accountLocked) {
+      console.log('choosing account', firstAccount);
+      this.chosenAccount = firstAccount;
+    }
+    let accountChanged = web3Present && this.chosenAccount !== undefined && firstAccount !== this.chosenAccount;
+    return {
+      web3Present: web3Present,
+      unsupportedNetwork: unsupportedNetwork,
+      chosenSupportedNetworkName: this.chosenSupportedNetworkName,
+      networkChanged: networkChanged,
+      chosenAccount: this.chosenAccount,
+      accountLocked: accountLocked,
+      accountChanged: accountChanged,
+      canMakePublicCalls: web3Present && !unsupportedNetwork && !networkChanged,
+      canMakeAccountCalls: web3Present && !unsupportedNetwork && !networkChanged && !accountLocked && !accountChanged
+    };
+  }
+
+  subscribeStatus(callback) {
+    this.statusSubscribers.push(callback);
+  }
+
+  checkCanMakePublicCalls(callbackIfNot) {
+    let status = this.getUpdatedStatus();
+    if (!status.canMakePublicCalls && callbackIfNot) {
+      window.setTimeout(function () { callbackIfNot(new Error('cannot make public calls: ' + status))}, 0);
+    }
+    return status.canMakePublicCalls;
+  }
+
+  checkCanMakeAccountCalls(callbackIfNot) {
+    let status = this.getUpdatedStatus();
+    if (!status.canMakeAccountCalls && callbackIfNot) {
+      window.setTimeout(function () { callbackIfNot(new Error('cannot make account calls: ' + status))}, 0);
+    }
+    return status.canMakeAccountCalls;
+  }
+
+  getOurAddress() {
+    return this.web3.eth.accounts[0];
+  }
+
+  getExchangeBalances(callback) {
+    if (!this.checkCanMakeAccountCalls(callback)) {
+      return;
+    }
+    this.bookContract.getClientBalances.call(this.getOurAddress(), callback);
+  }
+
+  getErc20Balance(erc20addr, callback) {
+
+  }
+
+  getErc20Approved(erc20addr, callback) {
+
+  }
+
+  getEtherBalance(callback) {
+
+  }
+
+  submitCounterEtherDeposit (amount, callback) {
+
+  }
+
+  submitErc20Approve (erc20addr, amount, callback) {
+
+  }
+
+  submitErc20Unapprove (erc20addr, amount, callback) {
+
+  }
+
+  submitBaseErc20Deposit ( amount, callback ) {
+
+  }
+
+  submitCounterEtherWithdraw ( amount, callback ) {
+
+  }
+
+  submitBaseErc20Withdraw ( amount, callback ) {
+
+  }
+
+  walkBook (fromPricePacked, callback) {
+    this.bookContract.walkBook.call(fromPricePacked, callback);
+  }
+
+  submitCreateOrder (orderId, price, sizeBase, terms, callback) {
+    if (!this.checkCanMakeAccountCalls(callback)) {
+      return;
+    }
+    this.bookContract.createOrder.sendTransaction(
+      orderId, price, sizeBase, terms,
+      { from: this.getOurAddress(), gas: 500000 },
+      callback
+    );
+  }
+  
+  submitContinueOrder (orderId, callback) {
+
+  }
+
+  submitCancelOrder (orderId, callback) {
+
+  }
+
+  getOrder(orderId, callback) {
+
+  }
+
+  getOrderStatus(orderId, callback) {
+
+  }
+
+  getAllOrderIds(callback) {
+    if (!this.checkCanMakeAccountCalls(callback)) {
+      return;
+    }
+    // TODO - optimise by starting from block where contract deployed
+    // perhaps still a bit expensive for metamask?
+    // or should we maintain a linked list in the contract of our orders?
+    var moreFilterOptions = {
+      fromBlock: 1000000
+    };
+    var filter = this.bookContract.ClientOrderCreated({client: this.getOurAddress()}, moreFilterOptions);
+    filter.get(callback);
+  }
+
+  getAllMarketEvents(fromBlock, callback) {
+    if (!this.checkCanMakePublicCalls(callback)) {
+      return;
+    }
+    // TODO - optimise by starting from block where we last took a snapshot of book state
+    // perhaps still a bit expensive for metamask?
+    // or should we try to find a nice way of querying for depth?
+    var moreFilterOptions = {
+      fromBlock: fromBlock
+    };
+    var filter = this.bookContract.MarketOrderEvent({}, moreFilterOptions);
+    filter.get(callback);
+  }
+
+  subscribeAllMarketEvents(fromBlock, callback) {
+
+  }
+
+}
