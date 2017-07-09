@@ -12,6 +12,8 @@ import mistLogo from './mist.png';
 import './App.css';
 
 import Bridge from './bridge.js'
+import UbiTokTypes from 'ubi-lib/ubi-tok-types.js';
+import BigNumber from 'bignumber.js';
 
 // Work around for:
 // a) passing Nav props into a form element
@@ -30,23 +32,16 @@ class App extends Component {
       depthByPrice: {}
     };
     this.bridge = new Bridge();
-    this.lastBridgeStatus = this.bridge.getUpdatedStatus();
+    this.lastBridgeStatus = this.bridge.getInitialStatus();
+    this.internalBook = new Map();
+    this.internalBookWalked = false;
+    this.marketEventQueue = [];
     this.state = {
       // who and where are we?
       "app": {
         "siteName": "UbiTok.io"
       },
-      "bridgeStatus": {
-        web3Present: false,
-        chosenSupportedNetworkName: undefined,
-        unsupportedNetwork: false,
-        networkChanged: false,
-        chosenAccount: undefined,
-        accountLocked: false,
-        accountChanged: false,
-        canMakePublicCalls: false,
-        canMakeAccountCalls: false
-      },
+      "bridgeStatus": this.bridge.getInitialStatus(),
       // what are we trading?
       "pairInfo": {
         "symbol": "UBI/ETH",
@@ -99,18 +94,8 @@ class App extends Component {
         "isComplete": false,
         // price, depth 
         // TODO - we might need blockId here so we know how stale our data is?
-        "asks": [
-            ["Sell @ 0.00000131", "2000000"],
-            ["Sell @ 0.00000130", "1000000"],
-            ["Sell @ 0.00000129", "1000000"],
-            ["Sell @ 0.00000128", "2000000"],
-        ],
-        "bids": [
-            ["Buy @ 0.00000124", "4100000"],
-            ["Buy @ 0.00000123", "5000000"],
-            ["Buy @ 0.00000122", "4100000"],
-            ["Buy @ 0.00000121", "5000000"]
-        ]
+        "asks": [],
+        "bids": []
       },
       // an order the user is preparing
       "createOrder": {
@@ -172,6 +157,11 @@ class App extends Component {
     this.bridge.subscribeStatus(this.handleStatusUpdate);
     window.setInterval(this.pollExchangeBalances, 2000);
   }
+
+  formatBase = (amount) => {
+    return UbiTokTypes.decodeAmount(amount, 18);
+  }
+
   handleStatusUpdate = (error, newBridgeStatus) => {
     let oldStatus = this.lastBridgeStatus;
     if (!oldStatus.canMakePublicCalls && newBridgeStatus.canMakePublicCalls) {
@@ -187,47 +177,133 @@ class App extends Component {
       }
     });
   }
+
   readPublicData = () => {
-    this.bridge.walkBook(1, this.handleWalkBook);
+    this.bridge.subscribeFutureMarketEvents(this.handleMarketEvent);
+    this.startWalkBook();
   }
+
   readAccountData = () => {
     this.bridge.getAllOrderIds(this.handleHistoricClientOrderCreated);
   }
+
+  handleMarketEvent = (error, result) => {
+    if (error) {
+      this.panic(error);
+      return;
+    }
+    let event = {
+      blockNumber: result.blockNumber,
+      eventRemoved: result.removed,
+      marketOrderEventType: UbiTokTypes.decodeMarketOrderEventType(result.args.marketOrderEventType),
+      orderId: UbiTokTypes.decodeOrderId(result.args.orderId),
+      pricePacked: result.args.pricePacked.toNumber(),
+      amountBase: result.args.amountBase
+    };
+    console.log('handleMarketEvent', event);
+    this.marketEventQueue.push(event);
+    this.consumeQueuedMarketEvents();
+  }
+
+  consumeQueuedMarketEvents = () => {
+    if (!this.internalBookWalked) {
+      return;
+    }
+    for (let event of this.marketEventQueue) {
+      let entry = this.internalBook.has(event.pricePacked) ? this.internalBook.get(event.pricePacked) : [new BigNumber(0), 0];
+      // TODO - probably want to fire off status update if this is one of our orders?
+      if (event.blockNumber > entry[1]) {
+        if (event.marketOrderEventType === 'Add') {
+          entry[0] = entry[0].add(event.amountBase);
+          entry[1] = event.blockNumber;
+        } else if (event.marketOrderEventType === 'Remove' || event.marketOrderEventType === 'Trade') {
+          entry[0] = entry[0].subtract(event.amountBase);
+          entry[1] = event.blockNumber;
+        }
+      }
+      this.internalBook.set(event.pricePacked, entry);
+    }
+    this.marketEventQueue = [];
+    this.updatePublicBook();
+  }
+
+  startWalkBook = () => {
+    console.log('startWalkBook ...');
+    this.internalBook.clear();
+    this.bridge.walkBook(1, this.handleWalkBook);    
+  }
+
   handleWalkBook = (error, result) => {
     console.log('handleWalkBook', error, result);
     if (error) {
       this.panic(error);
       return;
     }
-    var pricePacked = result[0].valueOf();
+    var pricePacked = result[0].toNumber();
     var depth = result[1];
-    var blockNumber = result[2].valueOf();
+    var blockNumber = result[2].toNumber();
     var nextPricePacked;
     var done = false;
     if (!depth.isZero()) {
-      console.log('found depth', depth.valueOf(), pricePacked.valueOf());
-      if (pricePacked === 32400) {
+      this.internalBook.set(pricePacked, [depth, blockNumber]);
+      if (pricePacked === UbiTokTypes.minSellPricePacked) {
         done = true;
       } else {
         nextPricePacked = pricePacked + 1;
       }
     } else {
-      if (pricePacked <= 16200) {
-        nextPricePacked = 16201;
+      if (pricePacked <= UbiTokTypes.minBuyPricePacked) {
+        nextPricePacked = UbiTokTypes.minSellPricePacked;
       } else {
         done = true;
       }
     }
     if (!done) {
       this.bridge.walkBook(nextPricePacked, this.handleWalkBook);
+    } else {
+      this.endWalkBook();
     }
   }
+
+  updatePublicBook = () => {
+    let bids = [];
+    let asks = [];
+    for (let entry of this.internalBook.entries()) {
+      let pricePacked = entry[0];
+      let depth = entry[1][0];
+      if (depth.comparedTo(0) <= 0) {
+        continue;
+      }
+      let friendlyDepth = this.formatBase(depth);
+      let price = UbiTokTypes.decodePrice(pricePacked);
+      if (pricePacked <= UbiTokTypes.minBuyPricePacked) {
+        bids.push([price, friendlyDepth]);
+      } else {
+        asks.push([price, friendlyDepth]);
+      }
+    }
+    this.setState((prevState, props) => {
+      return {
+        book: update(prevState.book, {
+          isComplete: {$set: true},
+          bids: {$set: bids},
+          asks: {$set: asks},
+        })
+      };
+    });
+  }
+
+  endWalkBook = () => {
+    console.log('book', this.internalBook);
+    this.internalBookWalked = true;
+    this.updatePublicBook();
+    this.consumeQueuedMarketEvents();
+  }
+
   handleHistoricClientOrderCreated = (error, result) => {
     console.log('handleHistoricClientOrderCreated', error, result);
   }
-  handleHistoricMarketEvents = (error, result) => {
-    console.log('handleHistoricMarketEvents', error, result);
-  }
+
   pollExchangeBalances = () => {
     this.bridge.getExchangeBalances(function (error, newClientBalances) {
       if (error) {
@@ -243,14 +319,17 @@ class App extends Component {
       });
     }.bind(this));
   }
+
   handleNavSelect = (e) => {
   }
+
   getValidationState() {
     const length = this.state.createOrder.buy.amountBase.length;
     if (length > 10) return 'success';
     else if (length > 5) return 'warning';
     else if (length > 0) return 'error';
   }
+
   handleCreateOrderSideSelect = (e) => {
     var v = e; // no event object for this one?
     this.setState((prevState, props) => {
@@ -261,6 +340,7 @@ class App extends Component {
       }
     });
   }
+
   handleCreateOrderBuyAmountBaseChange = (e) => {
     var v = e.target.value;
     this.setState((prevState, props) => {
@@ -271,6 +351,7 @@ class App extends Component {
       };
     });
   }
+
   handleCreateOrderBuyPriceChange = (e) => {
     var v = e.target.value;
     this.setState((prevState, props) => {
@@ -281,20 +362,24 @@ class App extends Component {
       };
     });
   }
+
   handlePlaceBuyOrder = (e) => {
-    var orderId = "" + new Date().valueOf();
+    var orderId = UbiTokTypes.generateEncodedOrderId();
     //submitCreateOrder (orderId, price, sizeBase, terms, callback)
-    this.bridge.submitCreateOrder(orderId, 8000, this.state.createOrder.buy.amountBase, 0, this.handlePlaceBuyOrderCallback);
+    var friendlyPrice = "Buy @ " + this.state.createOrder.buy.price;
+    var pricePacked = UbiTokTypes.encodePrice(friendlyPrice);
+    var sizeBase = UbiTokTypes.encodeAmount(this.state.createOrder.buy.amountBase, 18);
+    this.bridge.submitCreateOrder(orderId, pricePacked, sizeBase, 0, this.handlePlaceBuyOrderCallback);
     var newOrder = {
-            "orderId": orderId,
-            "price": "Buy @ 2.0",
-            "sizeBase": this.state.createOrder.buy.amountBase,
-            "terms": "GoodTillCancel",
-            "status": "New",
-            "cancelOrRejectReason": "None",
-            "executedBase": "0",
-            "executedQuoted": "0"
-          }
+      "orderId": UbiTokTypes.decodeOrderId(orderId),
+      "price": friendlyPrice,
+      "sizeBase": sizeBase,
+      "terms": "GoodTillCancel",
+      "status": "New",
+      "cancelOrRejectReason": "None",
+      "executedBase": "0",
+      "executedQuoted": "0"
+    };
     this.setState((prevState, props) => {
       return {
         myOrders: update(prevState.myOrders, {
@@ -303,6 +388,7 @@ class App extends Component {
       };
     });
   }
+
   handlePlaceBuyOrderCallback = (error, result) => {
     console.log('might have placed an order', error, result);
   }
@@ -573,7 +659,49 @@ class App extends Component {
                     </FormGroup>
                   </Tab>
                   <Tab eventKey={"sell"} title={"SELL " + this.state.pairInfo.base.symbol}>
-                    Tab 2 content
+                    <FormGroup controlId="createOrderSell" validationState={this.getValidationState()}>
+                      <ControlLabel>Amount ({this.state.pairInfo.base.symbol})</ControlLabel>
+                      <FormControl
+                        type="text"
+                        value={this.state.createOrder.sell.amountBase}
+                        placeholder={"How many " + this.state.pairInfo.base.symbol + " to sell"}
+                        onChange={this.handleCreateOrderSellAmountBaseChange}
+                      />
+                      <FormControl.Feedback />
+                      <ControlLabel>Price</ControlLabel>
+                      <FormControl
+                        type="text"
+                        value={this.state.createOrder.sell.price}
+                        placeholder={"How many " + this.state.pairInfo.counter.symbol + " per " + this.state.pairInfo.base.symbol}
+                        onChange={this.handleCreateOrderSellPriceChange}
+                      />
+                      <FormControl.Feedback />
+                      <ControlLabel>Return</ControlLabel>
+                      <HelpBlock>
+                        {this.state.createOrder.sell.returnCounter !== "" ? (
+                          <span>{this.state.createOrder.sell.returnCounter} {this.state.pairInfo.counter.symbol}</span>
+                        ) : (
+                          <span>Need amount and price.</span>
+                        )}
+                      </HelpBlock>
+                      <ControlLabel>Terms</ControlLabel>
+                      <FormControl componentClass="select" placeholder="select">
+                        <option value="GoodTillCancel">Good Till Cancel</option>
+                        <option value="GoodTillCancel">Good Till Cancel with Gas Top Up</option>
+                        <option value="Immediate Or Cancel">Immediate Or Cancel</option>
+                        <option value="MakerOnly">Maker Only</option>
+                      </FormControl>
+                    </FormGroup>
+                    <FormGroup>
+                      <ButtonToolbar>
+                        <Button bsStyle="primary" onClick={this.handlePlaceSellOrder}>
+                          Place Sell Order
+                        </Button>
+                      </ButtonToolbar>
+                      <HelpBlock>
+                        Order terms are explained at <a target="_blank" href="https://github.com/kieranelby/UbiTok.io/blob/master/docs/creating-orders.md">Creating Orders</a>.
+                      </HelpBlock>
+                    </FormGroup>
                   </Tab>
                 </Tabs>
               </Col>
@@ -595,7 +723,7 @@ class App extends Component {
                       <tr key={entry.orderId}>
                         <td>5 mins ago</td>
                         <td className="buy">{entry.price}</td>
-                        <td>{entry.sizeBase}</td>
+                        <td>{this.formatBase(entry.sizeBase)}</td>
                         <td>{entry.status}</td>
                         <td>{entry.executedBase}</td>
                         <td>

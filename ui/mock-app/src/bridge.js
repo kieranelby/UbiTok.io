@@ -11,12 +11,26 @@ export default class {
     this.chosenAccount = undefined;
     this.supportedNetworks = {
         "3": {
-            name: "Ropsten Test Network",
-            bookContractAddress: "0xeacaf5265fb6b253ce5d93fd197361a190be20d3"
+          name: "Ropsten Test Network",
+          bookContractAddress: "0x52154adf6b6b983631d5ee90e3d7dce5f3c5c89c"
         }
     };
     this.statusSubscribers = [];
     window.setTimeout(this.pollStatus, 1000);
+  }
+
+  getInitialStatus = () => {
+    return {
+      web3Present: false,
+      chosenSupportedNetworkName: undefined,
+      unsupportedNetwork: false,
+      networkChanged: false,
+      chosenAccount: undefined,
+      accountLocked: false,
+      accountChanged: false,
+      canMakePublicCalls: false,
+      canMakeAccountCalls: false
+    };
   }
 
   pollStatus = () => {
@@ -144,7 +158,7 @@ export default class {
       return;
     }
     this.bookContract.createOrder.sendTransaction(
-      orderId, price, sizeBase, terms,
+      orderId.valueOf(), price, sizeBase.valueOf(), terms,
       { from: this.getOurAddress(), gas: 500000 },
       callback
     );
@@ -180,22 +194,12 @@ export default class {
     filter.get(callback);
   }
 
-  getAllMarketEvents(fromBlock, callback) {
+  subscribeFutureMarketEvents(callback) {
     if (!this.checkCanMakePublicCalls(callback)) {
       return;
     }
-    // TODO - optimise by starting from block where we last took a snapshot of book state
-    // perhaps still a bit expensive for metamask?
-    // or should we try to find a nice way of querying for depth?
-    var moreFilterOptions = {
-      fromBlock: fromBlock
-    };
-    var filter = this.bookContract.MarketOrderEvent({}, moreFilterOptions);
-    filter.get(callback);
-  }
-
-  subscribeAllMarketEvents(fromBlock, callback) {
-
+    var filter = this.bookContract.MarketOrderEvent();
+    filter.watch(callback);
   }
 
 }

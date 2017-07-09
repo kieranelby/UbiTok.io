@@ -31,7 +31,7 @@ contract('UbiTokExchange', function(accounts) {
   it("should detect invalid packed prices when unpacking prices", function() {
     var examples = [
 	  [    0, "marker value for invalid price"],
-	  [32401, "just beyond max sell"],
+	  [21601, "just beyond max sell"],
 	  [32767, "max 15-bit"],
 	  [32768, "special in binary"],
 	  [65535, "could be treated as -1"]
@@ -50,17 +50,17 @@ contract('UbiTokExchange', function(accounts) {
 
   it("should pack and unpack valid prices", function() {
     var examples = [
-      [UbiTokTypes.encodeDirection('Buy'),      999,   5,     1, "buy price max"],
-      [UbiTokTypes.encodeDirection('Buy'),      100,  -6, 10800, "buy price min"],
-      [UbiTokTypes.encodeDirection('Buy'),      500,   2,  3200, "buy price 50.0"],
-      [UbiTokTypes.encodeDirection('Buy'),      100,   1,  4500, "buy price 1.0"],
-      [UbiTokTypes.encodeDirection('Buy'),      123,  -1,  6277, "buy price 0.0123"],
-      [UbiTokTypes.encodeDirection('Sell'),     100,  -6, 10801, "sell price min"],
-      [UbiTokTypes.encodeDirection('Sell'),     999,   5, 21600, "sell price max"],
-      [UbiTokTypes.encodeDirection('Sell'),     500,   2, 18401, "sell price 50.0"],
-      [UbiTokTypes.encodeDirection('Sell'),     123,  -1, 15324, "sell price 0.0123"],
-      [UbiTokTypes.encodeDirection('Sell'),     100,  -2, 14401, "sell price 0.001"],
-      [UbiTokTypes.encodeDirection('Sell'),     999,  -3, 14400, "sell price 0.000999"]
+      [UbiTokTypes.encodeDirection('Buy'),      999,   6,     1, "buy price max"],
+      [UbiTokTypes.encodeDirection('Buy'),      100,  -5, 10800, "buy price min"],
+      [UbiTokTypes.encodeDirection('Buy'),      500,   2,  4100, "buy price 50.0"],
+      [UbiTokTypes.encodeDirection('Buy'),      100,   1,  5400, "buy price 1.0"],
+      [UbiTokTypes.encodeDirection('Buy'),      123,  -1,  7177, "buy price 0.0123"],
+      [UbiTokTypes.encodeDirection('Sell'),     100,  -5, 10801, "sell price min"],
+      [UbiTokTypes.encodeDirection('Sell'),     999,   6, 21600, "sell price max"],
+      [UbiTokTypes.encodeDirection('Sell'),     500,   2, 17501, "sell price 50.0"],
+      [UbiTokTypes.encodeDirection('Sell'),     123,  -1, 14424, "sell price 0.0123"],
+      [UbiTokTypes.encodeDirection('Sell'),     100,  -2, 13501, "sell price 0.001"],
+      [UbiTokTypes.encodeDirection('Sell'),     999,  -3, 13500, "sell price 0.000999"]
     ];
     var uut;
     return UbiTokExchange.deployed().then(function(instance) {
@@ -104,17 +104,17 @@ contract('UbiTokExchange', function(accounts) {
 
   it("should calculate opposite packed price", function() {
     var examples = [
-      [UbiTokTypes.encodeDirection('Buy'),      999,   5,     1, "buy price max"],
-      [UbiTokTypes.encodeDirection('Buy'),      100,  -6, 10800, "buy price min"],
-      [UbiTokTypes.encodeDirection('Buy'),      500,   2,  3200, "buy price 50.0"],
-      [UbiTokTypes.encodeDirection('Buy'),      100,   1,  4500, "buy price 1.0"],
-      [UbiTokTypes.encodeDirection('Buy'),      123,  -1,  6277, "buy price 0.0123"],
-      [UbiTokTypes.encodeDirection('Sell'),     100,  -6, 10801, "sell price min"],
-      [UbiTokTypes.encodeDirection('Sell'),     999,   5, 21600, "sell price max"],
-      [UbiTokTypes.encodeDirection('Sell'),     500,   2, 18401, "sell price 50.0"],
-      [UbiTokTypes.encodeDirection('Sell'),     123,  -1, 15324, "sell price 0.0123"],
-      [UbiTokTypes.encodeDirection('Sell'),     100,  -2, 14401, "sell price 0.001"],
-      [UbiTokTypes.encodeDirection('Sell'),     999,  -3, 14400, "sell price 0.000999"]
+      [UbiTokTypes.encodeDirection('Buy'),      999,   6,     1, "buy price max"],
+      [UbiTokTypes.encodeDirection('Buy'),      100,  -5, 10800, "buy price min"],
+      [UbiTokTypes.encodeDirection('Buy'),      500,   2,  4100, "buy price 50.0"],
+      [UbiTokTypes.encodeDirection('Buy'),      100,   1,  5400, "buy price 1.0"],
+      [UbiTokTypes.encodeDirection('Buy'),      123,  -1,  7177, "buy price 0.0123"],
+      [UbiTokTypes.encodeDirection('Sell'),     100,  -5, 10801, "sell price min"],
+      [UbiTokTypes.encodeDirection('Sell'),     999,   6, 21600, "sell price max"],
+      [UbiTokTypes.encodeDirection('Sell'),     500,   2, 17501, "sell price 50.0"],
+      [UbiTokTypes.encodeDirection('Sell'),     123,  -1, 14424, "sell price 0.0123"],
+      [UbiTokTypes.encodeDirection('Sell'),     100,  -2, 13501, "sell price 0.001"],
+      [UbiTokTypes.encodeDirection('Sell'),     999,  -3, 13500, "sell price 0.000999"]
     ];
     var uut;
     return UbiTokExchange.deployed().then(function(instance) {
@@ -171,7 +171,7 @@ contract('UbiTokExchange', function(accounts) {
     [ 1001, 0, web3.toWei(1, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), "obviously invalid price", "InvalidPrice" ],
     [ 1002, packedBuyOnePointZero, web3.toWei(100, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), "not enough funds", "InsufficientFunds" ],
     [ 1003, packedBuyOnePointZero, new web3.BigNumber("1e39"), UbiTokTypes.encodeTerms('GoodTillCancel'), "preposterously large base size", "InvalidSize" ],
-    [ 1004, packedMaxBuyPrice, new web3.BigNumber("1e35"), UbiTokTypes.encodeTerms('GoodTillCancel'), "preposterously large quoted size (but base ok)", "InvalidSize" ],
+    [ 1004, packedMaxBuyPrice, new web3.BigNumber("1e36"), UbiTokTypes.encodeTerms('GoodTillCancel'), "preposterously large quoted size (but base just ok)", "InvalidSize" ],
     [ 1005, packedBuyOnePointZero, 90, UbiTokTypes.encodeTerms('GoodTillCancel'), "small base size", "InvalidSize" ],
     [ 1006, packedBuyOnePointZero, 900, UbiTokTypes.encodeTerms('GoodTillCancel'), "small quoted size (but base ok)", "InvalidSize" ],
   ];
@@ -286,8 +286,8 @@ function buildScenario(chain, context, commands, expectedOrders, expectedBalance
 contract('UbiTokExchange', function(accounts) {
   it("two orders that don't match", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell@0.600", 100000, 'GoodTillCancel']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.600", 100000, 'GoodTillCancel']
     ];
     var expectedOrders = [
       ["101", 'Open', 'None', 0,  0],
@@ -310,8 +310,8 @@ contract('UbiTokExchange', function(accounts) {
 contract('UbiTokExchange', function(accounts) {
   it("two orders exactly match", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell@0.500", 100000, 'GoodTillCancel']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.500", 100000, 'GoodTillCancel']
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000,  50000],
@@ -334,8 +334,8 @@ contract('UbiTokExchange', function(accounts) {
 contract('UbiTokExchange', function(accounts) {
   it("two orders partial match of 2nd", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell@0.500", 300000, 'GoodTillCancel']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.500", 300000, 'GoodTillCancel']
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000,  50000],
@@ -359,8 +359,8 @@ contract('UbiTokExchange', function(accounts) {
 contract('UbiTokExchange', function(accounts) {
   it("two orders best execution", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell@0.400", 100000, 'GoodTillCancel']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.400", 100000, 'GoodTillCancel']
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000,  50000],
@@ -384,9 +384,9 @@ contract('UbiTokExchange', function(accounts) {
 contract('UbiTokExchange', function(accounts) {
   it("three orders mixed prices", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client1", "102",  "Buy@0.600", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell@0.400", 200000, 'GoodTillCancel']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client1", "102",  "Buy @ 0.600", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.400", 200000, 'GoodTillCancel']
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000,  50000],
@@ -410,9 +410,9 @@ contract('UbiTokExchange', function(accounts) {
 contract('UbiTokExchange', function(accounts) {
   it("order takes and makes", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell@0.400", 200000, 'GoodTillCancel'],
-      ['Create', 'OK', "client3", "301",  "Buy@0.500",  50000, 'GoodTillCancel'],
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.400", 200000, 'GoodTillCancel'],
+      ['Create', 'OK', "client3", "301",  "Buy @ 0.500",  50000, 'GoodTillCancel'],
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000,  50000],
@@ -437,8 +437,8 @@ contract('UbiTokExchange', function(accounts) {
 contract('UbiTokExchange', function(accounts) {
   it("maker-only rejected if any would take", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell@0.400", 200000, 'MakerOnly']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.400", 200000, 'MakerOnly']
     ];
     var expectedOrders = [
       ["101", 'Open',     'None',      0,  0],
@@ -461,8 +461,8 @@ contract('UbiTokExchange', function(accounts) {
 contract('UbiTokExchange', function(accounts) {
   it("maker-only accepted if none would take", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell@0.600", 200000, 'MakerOnly']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.600", 200000, 'MakerOnly']
     ];
     var expectedOrders = [
       ["101", 'Open', 'None', 0,  0],
@@ -485,8 +485,8 @@ contract('UbiTokExchange', function(accounts) {
 contract('UbiTokExchange', function(accounts) {
   it("IoC cancelled if none would match", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell@0.600", 200000, 'ImmediateOrCancel']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.600", 200000, 'ImmediateOrCancel']
     ];
     var expectedOrders = [
       ["101", 'Open', 'None', 0,  0],
@@ -509,8 +509,8 @@ contract('UbiTokExchange', function(accounts) {
 contract('UbiTokExchange', function(accounts) {
   it("IoC completed if all matches", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell@0.400",  50000, 'ImmediateOrCancel']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.400",  50000, 'ImmediateOrCancel']
     ];
     var expectedOrders = [
       ["101", 'Open', 'None', 50000,  25000],
@@ -533,8 +533,8 @@ contract('UbiTokExchange', function(accounts) {
 contract('UbiTokExchange', function(accounts) {
   it("IoC remaining cancelled if some matches", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy@0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell@0.400", 200000, 'ImmediateOrCancel']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.400", 200000, 'ImmediateOrCancel']
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000, 50000],
@@ -555,12 +555,12 @@ contract('UbiTokExchange', function(accounts) {
 });
 
 contract('UbiTokExchange', function(accounts) {
-  var packedBuyOnePointZero = 4500;
+  var packedBuyOnePointZero = UbiTokTypes.encodePrice('Buy @ 1.00');
   var packedMaxBuyPrice = 1;
   var minSellPricePacked = 10801;
-  var buyFiftyPricePacked = 3200;
-  var buyPoint0123PricePacked = 6277;
-  var sellFiftyPricePacked = 18401;
+  var buyFiftyPricePacked = UbiTokTypes.encodePrice('Buy @ 50.0');
+  var buyPoint0123PricePacked = UbiTokTypes.encodePrice('Buy @ 0.123');
+  var sellFiftyPricePacked = UbiTokTypes.encodePrice('Sell @ 50.0');
   it("allows finding first open order from a price", function() {
     var uut;
     return UbiTokExchange.deployed().then(function(instance) {

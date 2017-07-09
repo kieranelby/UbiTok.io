@@ -17,7 +17,11 @@ contract UbiTokExchange {
     Unknown,
     Rejected,
     Open,
-    Done
+    Done,
+    NeedsGas, // TODO
+    New, // web3 only
+    Sent, // web3 only
+    FailedSend // web3 only
   }
 
   enum CancelOrRejectReason {
@@ -34,7 +38,8 @@ contract UbiTokExchange {
   enum Terms {
     GoodTillCancel,
     ImmediateOrCancel,
-    MakerOnly
+    MakerOnly,
+    GTCWithGasTopup // TODO
   }
   
   struct Order {
@@ -71,7 +76,7 @@ contract UbiTokExchange {
 
   event MarketOrderEvent(MarketOrderEventType marketOrderEventType, uint128 orderId, uint16 pricePacked, uint amountBase);
   
-  int8 public minimumPriceExponent = -6;
+  int8 public minimumPriceExponent = -5;
   
   string public baseTradableSymbol = 'UBI';
   uint public baseTradableDisplayDecimals = 18;
@@ -157,12 +162,12 @@ contract UbiTokExchange {
   // The packed representation has 32001 different price values:
   //
   //      0  = invalid (can be used as marker value)
-  //      1  = buy at maximum price (0.999 * 10 ** 9)
+  //      1  = buy at maximum price (0.999 * 10 ** 6)
   //    ...  = other buy prices in descending order
-  //  10800  = buy at minimum price (0.100 * 10 ** -8)
-  //  10801  = sell at minimum price (0.100 * 10 ** -8)
+  //  10800  = buy at minimum price (0.100 * 10 ** -5)
+  //  10801  = sell at minimum price (0.100 * 10 ** -5)
   //    ...  = other sell prices in descending order
-  //  21600  = sell at maximum price (0.999 * 10 ** 9)
+  //  21600  = sell at maximum price (0.999 * 10 ** 6)
   //  21601+ = do not use
   //
   // If we want to map each packed price to a boolean value (which we do),
