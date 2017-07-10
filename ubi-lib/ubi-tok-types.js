@@ -277,3 +277,7 @@ exports.generateEncodedOrderId = () => {
   let uuidWithoutDashes = uuidv4().replace(/-/g, '');
   return new BigDecimal(uuidWithoutDashes, 16);
 };
+
+exports.generateDecodedOrderId = () => {
+  return exports.decodeOrderId(exports.generateEncodedOrderId());
+};

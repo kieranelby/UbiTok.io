@@ -16,6 +16,8 @@ export default class {
         }
     };
     this.statusSubscribers = [];
+    this.baseDecimals = 18;
+    this.cntrDecimals = 18;
     window.setTimeout(this.pollStatus, 1000);
   }
 
@@ -82,11 +84,11 @@ export default class {
     };
   }
 
-  subscribeStatus(callback) {
+  subscribeStatus = (callback) => {
     this.statusSubscribers.push(callback);
   }
 
-  checkCanMakePublicCalls(callbackIfNot) {
+  checkCanMakePublicCalls = (callbackIfNot) => {
     let status = this.getUpdatedStatus();
     if (!status.canMakePublicCalls && callbackIfNot) {
       window.setTimeout(function () { callbackIfNot(new Error('cannot make public calls: ' + status))}, 0);
@@ -94,7 +96,7 @@ export default class {
     return status.canMakePublicCalls;
   }
 
-  checkCanMakeAccountCalls(callbackIfNot) {
+  checkCanMakeAccountCalls = (callbackIfNot) => {
     let status = this.getUpdatedStatus();
     if (!status.canMakeAccountCalls && callbackIfNot) {
       window.setTimeout(function () { callbackIfNot(new Error('cannot make account calls: ' + status))}, 0);
@@ -102,85 +104,101 @@ export default class {
     return status.canMakeAccountCalls;
   }
 
-  getOurAddress() {
+  getOurAddress = () => {
     return this.web3.eth.accounts[0];
   }
 
-  getExchangeBalances(callback) {
+  getExchangeBalances = (callback) => {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
-    this.bookContract.getClientBalances.call(this.getOurAddress(), callback);
+    let wrapperCallback = (error, result) => {
+      if (error) {
+        return callback(error, undefined);
+      } else {
+        let translatedResult = [
+          UbiTokTypes.decodeAmount(result[0], this.baseDecimals),
+          UbiTokTypes.decodeAmount(result[1], this.cntrDecimals)
+        ];
+        return callback(error, translatedResult);
+      }
+    };
+    this.bookContract.getClientBalances.call(this.getOurAddress(), wrapperCallback);
   }
 
-  getErc20Balance(erc20addr, callback) {
-
-  }
-
-  getErc20Approved(erc20addr, callback) {
-
-  }
-
-  getEtherBalance(callback) {
-
-  }
-
-  submitCounterEtherDeposit (amount, callback) {
-
-  }
-
-  submitErc20Approve (erc20addr, amount, callback) {
+  getErc20Balance = (erc20addr, callback) => {
 
   }
 
-  submitErc20Unapprove (erc20addr, amount, callback) {
+  getErc20Approved = (erc20addr, callback) => {
 
   }
 
-  submitBaseErc20Deposit ( amount, callback ) {
+  getEtherBalance = (callback) => {
 
   }
 
-  submitCounterEtherWithdraw ( amount, callback ) {
+  submitCounterEtherDeposit = (fmtAmount, callback) => {
 
   }
 
-  submitBaseErc20Withdraw ( amount, callback ) {
+  submitErc20Approve = (erc20addr, fmtAmount, callback) => {
 
   }
 
-  walkBook (fromPricePacked, callback) {
+  submitErc20Unapprove = (erc20addr, fmtAmount, callback) => {
+
+  }
+
+  submitBaseErc20Deposit = (fmtAmount, callback) => {
+
+  }
+
+  submitCounterEtherWithdraw = (fmtAmount, callback) => {
+
+  }
+
+  submitBaseErc20Withdraw = (fmtAmount, callback) => {
+
+  }
+
+  walkBook = (fromPricePacked, callback) => {
     this.bookContract.walkBook.call(fromPricePacked, callback);
   }
 
-  submitCreateOrder (orderId, price, sizeBase, terms, callback) {
+  submitCreateOrder = (fmtOrderId, fmtPrice, fmtSizeBase, fmtTerms, callback) => {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
     this.bookContract.createOrder.sendTransaction(
-      orderId.valueOf(), price, sizeBase.valueOf(), terms,
+      // TODO - valueOf is just to work around an annoying recent web3 bug ...
+      UbiTokTypes.encodeOrderId(fmtOrderId).valueOf(),
+      UbiTokTypes.encodePrice(fmtPrice).valueOf(),
+      UbiTokTypes.encodeAmount(fmtSizeBase, this.baseDecimals).valueOf(),
+      UbiTokTypes.encodeTerms(fmtTerms).valueOf(),
       { from: this.getOurAddress(), gas: 500000 },
       callback
     );
   }
   
-  submitContinueOrder (orderId, callback) {
+  submitContinueOrder = (fmtOrderId, callback) => {
 
   }
 
-  submitCancelOrder (orderId, callback) {
+  submitCancelOrder = (fmtOrderId, callback) => {
 
   }
 
-  getOrder(orderId, callback) {
+  getOrder = (fmtOrderId, callback) => {
 
   }
 
-  getOrderStatus(orderId, callback) {
+  getOrderStatus = (fmtOrderId, callback) => {
 
   }
 
-  getAllOrderIds(callback) {
+  // TODO - replace with walk function
+  getAllOrderIds = (callback) => {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
@@ -194,12 +212,17 @@ export default class {
     filter.get(callback);
   }
 
-  subscribeFutureMarketEvents(callback) {
+  subscribeFutureMarketEvents = (callback) => {
     if (!this.checkCanMakePublicCalls(callback)) {
       return;
     }
     var filter = this.bookContract.MarketOrderEvent();
+    // TODO - should translate events ...
     filter.watch(callback);
+  }
+
+  getHistoricMarketTrades = (callback) => {
+    // TODO - last 50,000 blocks or something
   }
 
 }

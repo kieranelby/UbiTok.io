@@ -54,7 +54,7 @@ class App extends Component {
           "minInitialSize": "10000",
           "minRemainingSize": "1000",
         },
-        "counter": {
+        "cntr": {
           "tradableType": "Ether",
           "symbol": "ETH",
           "name": "Ether",
@@ -104,37 +104,18 @@ class App extends Component {
         "buy": {
           "amountBase": "",
           "price": "",
-          "costCounter": ""
+          "costCntr": ""
         },
         "sell": {
           "amountBase": "",
           "price": "",
-          "costCounter": ""
+          "returnCntr": ""
         }
       },
       // orders we've created
       "myOrders": {
-        // is this a complete record, or should we offer a 'Loading ...' indicator or
-        // a 'Show More ...' button? (TODO - how to know which - two different things?)
         "isComplete": false,
-        // TODO - how can we efficiently enumerate our orders? EVM event filters?
-        // but how far to go back? how well do topic filters work?
-        // perhaps contract can maintain lastOrderIdForClient + clientPrevOrderId? adds gas costs tho.
-        // used when finding history with EVM events
-        "startBlock": null,
-        "orders": [
-          // TODO - time? blockId?
-          {
-            "orderId": "101",
-            "price": "Buy @ 0.00000123",
-            "sizeBase": "2000000",
-            "terms": "GoodTillCancel",
-            "status": "Open",
-            "cancelOrRejectReason": "None",
-            "executedBase": "500000",
-            "executedQuoted": "50000"
-          }
-        ]
+        "orders": [ ]
       },
       // trades that have happened in the market
       "marketTrades": {
@@ -217,7 +198,7 @@ class App extends Component {
           entry[0] = entry[0].add(event.amountBase);
           entry[1] = event.blockNumber;
         } else if (event.marketOrderEventType === 'Remove' || event.marketOrderEventType === 'Trade') {
-          entry[0] = entry[0].subtract(event.amountBase);
+          entry[0] = entry[0].minus(event.amountBase);
           entry[1] = event.blockNumber;
         }
       }
@@ -321,8 +302,10 @@ class App extends Component {
   }
 
   handleNavSelect = (e) => {
+    // TODO - load different page?
   }
 
+  // TODO - totally wrong
   getValidationState() {
     const length = this.state.createOrder.buy.amountBase.length;
     if (length > 10) return 'success';
@@ -352,6 +335,17 @@ class App extends Component {
     });
   }
 
+  handleCreateOrderSellAmountBaseChange = (e) => {
+    var v = e.target.value;
+    this.setState((prevState, props) => {
+      return {
+        createOrder: update(prevState.createOrder, {
+          sell: { amountBase: { $set: v } }
+        })
+      };
+    });
+  }
+
   handleCreateOrderBuyPriceChange = (e) => {
     var v = e.target.value;
     this.setState((prevState, props) => {
@@ -363,18 +357,31 @@ class App extends Component {
     });
   }
 
+  handleCreateOrderSellPriceChange = (e) => {
+    var v = e.target.value;
+    this.setState((prevState, props) => {
+      return {
+        createOrder: update(prevState.createOrder, {
+          sell: { price: { $set: v } }
+        })
+      };
+    });
+  }
+
   handlePlaceBuyOrder = (e) => {
-    var orderId = UbiTokTypes.generateEncodedOrderId();
-    //submitCreateOrder (orderId, price, sizeBase, terms, callback)
-    var friendlyPrice = "Buy @ " + this.state.createOrder.buy.price;
-    var pricePacked = UbiTokTypes.encodePrice(friendlyPrice);
-    var sizeBase = UbiTokTypes.encodeAmount(this.state.createOrder.buy.amountBase, 18);
-    this.bridge.submitCreateOrder(orderId, pricePacked, sizeBase, 0, this.handlePlaceBuyOrderCallback);
+    var orderId = UbiTokTypes.generateDecodedOrderId();
+    var price = "Buy @ " + this.state.createOrder.buy.price;
+    var sizeBase = this.state.createOrder.buy.amountBase;
+    var terms = 'GoodTillCancel';
+    let callback = (error, result) => {
+      this.handlePlaceOrderCallback(orderId, error, result);
+    };
+    this.bridge.submitCreateOrder(orderId, price, sizeBase, terms, callback);
     var newOrder = {
-      "orderId": UbiTokTypes.decodeOrderId(orderId),
-      "price": friendlyPrice,
+      "orderId": orderId,
+      "price": price,
       "sizeBase": sizeBase,
-      "terms": "GoodTillCancel",
+      "terms": terms,
       "status": "New",
       "cancelOrRejectReason": "None",
       "executedBase": "0",
@@ -389,8 +396,36 @@ class App extends Component {
     });
   }
 
-  handlePlaceBuyOrderCallback = (error, result) => {
-    console.log('might have placed an order', error, result);
+  handlePlaceSellOrder = (e) => {
+    var orderId = UbiTokTypes.generateDecodedOrderId();
+    var price = "Sell @ " + this.state.createOrder.sell.price;
+    var sizeBase = this.state.createOrder.sell.amountBase;
+    var terms = 'GoodTillCancel';
+    let callback = (error, result) => {
+      this.handlePlaceOrderCallback(orderId, error, result);
+    };
+    this.bridge.submitCreateOrder(orderId, price, sizeBase, terms, callback);
+    var newOrder = {
+      "orderId": orderId,
+      "price": price,
+      "sizeBase": sizeBase,
+      "terms": terms,
+      "status": "New",
+      "cancelOrRejectReason": "None",
+      "executedBase": "0",
+      "executedQuoted": "0"
+    };
+    this.setState((prevState, props) => {
+      return {
+        myOrders: update(prevState.myOrders, {
+          orders: { $push: [newOrder] }
+        })
+      };
+    });
+  }
+
+  handlePlaceOrderCallback = (orderId, error, result) => {
+    console.log('might have placed order', orderId, error, result);
   }
   
   render() {
@@ -489,22 +524,22 @@ class App extends Component {
                     <tr>
                       <td>Symbol</td>
                       <td>{this.state.pairInfo.base.symbol}</td>
-                      <td>{this.state.pairInfo.counter.symbol}</td>
+                      <td>{this.state.pairInfo.cntr.symbol}</td>
                     </tr>
                     <tr>
                       <td>Name</td>
                       <td>{this.state.pairInfo.base.name}</td>
-                      <td>{this.state.pairInfo.counter.name}</td>
+                      <td>{this.state.pairInfo.cntr.name}</td>
                     </tr>
                     <tr>
                       <td>Type</td>
                       <td>{this.state.pairInfo.base.tradableType}</td>
-                      <td>{this.state.pairInfo.counter.tradableType}</td>
+                      <td>{this.state.pairInfo.cntr.tradableType}</td>
                     </tr>
                     <tr>
                       <td>Minimum Size</td>
                       <td>{this.state.pairInfo.base.minInitialSize}</td>
-                      <td>{this.state.pairInfo.counter.minInitialSize}</td>
+                      <td>{this.state.pairInfo.cntr.minInitialSize}</td>
                     </tr>
                   </tbody>
                 </Table>
@@ -519,11 +554,11 @@ class App extends Component {
                   <tbody>
                     <tr>
                       <td>{this.state.pairInfo.base.symbol}</td>
-                      <td>{this.state.balances.exchange[0].toString()}</td>
+                      <td>{this.state.balances.exchange[0]}</td>
                     </tr>
                     <tr>
-                      <td>{this.state.pairInfo.counter.symbol}</td>
-                      <td>{this.state.balances.exchange[1].toString()}</td>
+                      <td>{this.state.pairInfo.cntr.symbol}</td>
+                      <td>{this.state.balances.exchange[1]}</td>
                     </tr>
                   </tbody>
                 </Table>
@@ -627,14 +662,14 @@ class App extends Component {
                       <FormControl
                         type="text"
                         value={this.state.createOrder.buy.price}
-                        placeholder={"How many " + this.state.pairInfo.counter.symbol + " per " + this.state.pairInfo.base.symbol}
+                        placeholder={"How many " + this.state.pairInfo.cntr.symbol + " per " + this.state.pairInfo.base.symbol}
                         onChange={this.handleCreateOrderBuyPriceChange}
                       />
                       <FormControl.Feedback />
                       <ControlLabel>Cost</ControlLabel>
                       <HelpBlock>
-                        {this.state.createOrder.buy.costCounter !== "" ? (
-                          <span>{this.state.createOrder.buy.costCounter} {this.state.pairInfo.counter.symbol}</span>
+                        {this.state.createOrder.buy.costCntr !== "" ? (
+                          <span>{this.state.createOrder.buy.costCntr} {this.state.pairInfo.cntr.symbol}</span>
                         ) : (
                           <span>Need amount and price.</span>
                         )}
@@ -672,14 +707,14 @@ class App extends Component {
                       <FormControl
                         type="text"
                         value={this.state.createOrder.sell.price}
-                        placeholder={"How many " + this.state.pairInfo.counter.symbol + " per " + this.state.pairInfo.base.symbol}
+                        placeholder={"How many " + this.state.pairInfo.cntr.symbol + " per " + this.state.pairInfo.base.symbol}
                         onChange={this.handleCreateOrderSellPriceChange}
                       />
                       <FormControl.Feedback />
                       <ControlLabel>Return</ControlLabel>
                       <HelpBlock>
-                        {this.state.createOrder.sell.returnCounter !== "" ? (
-                          <span>{this.state.createOrder.sell.returnCounter} {this.state.pairInfo.counter.symbol}</span>
+                        {this.state.createOrder.sell.returnCntr !== "" ? (
+                          <span>{this.state.createOrder.sell.returnCntr} {this.state.pairInfo.cntr.symbol}</span>
                         ) : (
                           <span>Need amount and price.</span>
                         )}
@@ -722,8 +757,9 @@ class App extends Component {
                       {this.state.myOrders.orders.map((entry) =>
                       <tr key={entry.orderId}>
                         <td>5 mins ago</td>
+                        {/* TODO - choose buy/sell */}
                         <td className="buy">{entry.price}</td>
-                        <td>{this.formatBase(entry.sizeBase)}</td>
+                        <td>{entry.sizeBase}</td>
                         <td>{entry.status}</td>
                         <td>{entry.executedBase}</td>
                         <td>
