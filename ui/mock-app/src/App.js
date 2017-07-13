@@ -37,12 +37,13 @@ class App extends Component {
     this.internalBookWalked = false;
     this.marketEventQueue = [];
     this.state = {
-      // who and where are we?
-      "app": {
-        "siteName": "UbiTok.io"
-      },
+
+      // are we connected to Ethereum network? which network? what account?
+
       "bridgeStatus": this.bridge.getInitialStatus(),
+
       // what are we trading?
+
       "pairInfo": {
         "symbol": "UBI/ETH",
         "base": {
@@ -59,14 +60,17 @@ class App extends Component {
           "symbol": "ETH",
           "name": "Ether",
           "displayDecimals": 18,
+          // TODO - raw or friendly?
           "minInitialSize": "1000000",
           "minRemainingSize": "100000",
         },
         "minPrice" : "0.000001",
         "maxPrice" : "999000"
       },
+
       // how much money do we have where?
       // all are pairs of [ base, counter ] where "" = unknown
+
       "balances": {
         "wallet": ["", ""],
         // e.g. if we have approved some of our ERC20 funds for the contract
@@ -74,8 +78,10 @@ class App extends Component {
         "approvedButNotTransferred": ["", ""],
         "exchange": ["", ""]
       },
+
       // TODO - some sort of deposit/withdraw/approve form
       // payments we've made
+
       "myPayments": {
         // is this a complete record, or should we offer a 'Loading ...' indicator or
         // a 'Show More ...' button? (TODO - how to know which - two different things?)
@@ -88,16 +94,19 @@ class App extends Component {
             // Not sure
         ]
       },
+
+      // the order book
+
       "book": {
-        // is this a complete record, or should we offer a 'Loading ...' indicator or
-        // a 'Show More ...' button? (TODO - how to know which - two different things?)
+        // have we finished walking the book initially?
         "isComplete": false,
-        // price, depth 
-        // TODO - we might need blockId here so we know how stale our data is?
+        // friendly price + depth pairs, sorted for display
         "asks": [],
         "bids": []
       },
-      // an order the user is preparing
+
+      // orders the user is preparing to place
+
       "createOrder": {
         // have they selected buy or sell base?
         "side": "buy",
@@ -112,31 +121,82 @@ class App extends Component {
           "returnCntr": ""
         }
       },
-      // orders we've created
+
+      // orders the client has created
+      // (keyed by orderId, which sorting as a string corresponds to sorting by client-claimed-creation-time)
+      // Example:
+      //   "Rbc23fg9" : {
+      //     "orderId": "Rbc23fg9",
+      //     // TODO - need some sort of guess as to when placed here?
+      //     "price": price,
+      //     "sizeBase": sizeBase,
+      //     "terms": terms,
+      //     "status": "New",
+      //     "reasonCode": "None",
+      //     "rawExecutedBase": new BigNumber(0),
+      //     "rawExecutedQuoted": new BigNumber(0),
+      //     "rawFeeAmount": new BigNumber(0)
+      //   }
+      //
+
       "myOrders": {
-        "isComplete": false,
-        "orders": [ ]
       },
-      // trades that have happened in the market
+
+      // Trades that have happened in the market (keyed by something unique).
+      // Example:
+      //
+      //  "123-99": {
+      //    "marketTradeId": "123-99",
+      //    "blockNumber": 123,
+      //    "logIndex": 99
+      //    "makerOrderId":"Rb101x",
+      //    "makerPrice":"Buy @ 0.00000123",
+      //    "executedBase":"50.0",
+      //  }
+      //
+      
       "marketTrades": {
-        // is this a complete record, or should we offer a 'Loading ...' indicator or
-        // a 'Show More ...' button? (TODO - how to know which - two different things?)
-        "isComplete": false,
-        // used when finding history with EVM events
-        "startBlock": null,
-        // TODO - time? blockId?
-        "trades": [
-          {
-            "makerOrderId":"101",
-            "takerOrderId":"102",
-            "makerPrice":"Buy @ 0.00000123",
-            "executedBase":"500000"
-          }
-        ]
       }
+
     };
     this.bridge.subscribeStatus(this.handleStatusUpdate);
     window.setInterval(this.pollExchangeBalances, 2000);
+  }
+
+  getMySortedOrders = () => {
+    // we generate our orderIds in chronological order, want opposite
+    // how expensive is this?
+    return Object.keys(this.state.myOrders).sort(
+      (a,b) => {
+        if (a < b) {
+          return 1;
+        }
+        if (a > b) {
+          return -1;
+        }
+        return 0;
+      }
+    ).map((orderId) => this.state.myOrders[orderId]);
+  }
+
+  // is this a bit complicated? could we just format the ids in a sort-friendly way?
+  // want newest first
+  cmpMarketTradeIds = (aId, bId) => {
+    var a = this.state.marketTrades[aId];
+    var b = this.state.marketTrades[bId];
+    if (a.blockNumber < b.blockNumber) {
+      return 1;
+    }
+    if (a.blockNumber > b.blockNumber) {
+      return -1;
+    }
+    if (a.logIndex < b.logIndex) {
+      return 1;
+    }
+    if (a.logIndex > b.logIndex) {
+      return -1;
+    }
+    return 0;
   }
 
   formatBase = (amount) => {
@@ -175,6 +235,7 @@ class App extends Component {
     }
     let event = {
       blockNumber: result.blockNumber,
+      logIndex: result.logIndex,
       eventRemoved: result.removed,
       marketOrderEventType: UbiTokTypes.decodeMarketOrderEventType(result.args.marketOrderEventType),
       orderId: UbiTokTypes.decodeOrderId(result.args.orderId),
@@ -193,6 +254,8 @@ class App extends Component {
     for (let event of this.marketEventQueue) {
       let entry = this.internalBook.has(event.pricePacked) ? this.internalBook.get(event.pricePacked) : [new BigNumber(0), 0];
       // TODO - probably want to fire off status update if this is one of our orders?
+      // (but how do we know when a taker order gets mined?)
+      // update internal book
       if (event.blockNumber > entry[1]) {
         if (event.marketOrderEventType === 'Add') {
           entry[0] = entry[0].add(event.amountBase);
@@ -203,11 +266,33 @@ class App extends Component {
         }
       }
       this.internalBook.set(event.pricePacked, entry);
+      // update market trades
+      if (event.marketOrderEventType === 'Trade') {
+        // could simplify by making this naturally sortable?
+        this.addMarketTrade({
+          marketTradeId: "" + event.blockNumber + "-" + event.logIndex,
+          blockNumber: event.blockNumber,
+          logIndex: event.logIndex,
+          makerOrderId: event.orderId,
+          makerPrice: UbiTokTypes.decodePrice(event.pricePacked),
+          executedBase: this.formatBase(event.amountBase),
+        });
+      }
     }
     this.marketEventQueue = [];
     this.updatePublicBook();
   }
 
+  addMarketTrade = (marketTrade) => {
+    this.setState((prevState, props) => {
+      let entry = {};
+      entry[marketTrade.marketTradeId] = marketTrade;
+      return {
+        marketTrades: update(prevState.marketTrades, { $merge: entry })
+      };
+    });
+  }
+  
   startWalkBook = () => {
     console.log('startWalkBook ...');
     this.internalBook.clear();
@@ -249,13 +334,14 @@ class App extends Component {
   updatePublicBook = () => {
     let bids = [];
     let asks = [];
-    for (let entry of this.internalBook.entries()) {
+    let sortedEntries = Array.from(this.internalBook.entries()).sort((a,b) => a[0]-b[0]);
+    for (let entry of sortedEntries) {
       let pricePacked = entry[0];
-      let depth = entry[1][0];
-      if (depth.comparedTo(0) <= 0) {
+      let rawDepth = entry[1][0];
+      if (rawDepth.comparedTo(0) <= 0) {
         continue;
       }
-      let friendlyDepth = this.formatBase(depth);
+      let friendlyDepth = this.formatBase(rawDepth);
       let price = UbiTokTypes.decodePrice(pricePacked);
       if (pricePacked <= UbiTokTypes.minBuyPricePacked) {
         bids.push([price, friendlyDepth]);
@@ -263,6 +349,7 @@ class App extends Component {
         asks.push([price, friendlyDepth]);
       }
     }
+    asks.reverse();
     this.setState((prevState, props) => {
       return {
         book: update(prevState.book, {
@@ -377,21 +464,16 @@ class App extends Component {
       this.handlePlaceOrderCallback(orderId, error, result);
     };
     this.bridge.submitCreateOrder(orderId, price, sizeBase, terms, callback);
-    var newOrder = {
-      "orderId": orderId,
-      "price": price,
-      "sizeBase": sizeBase,
-      "terms": terms,
-      "status": "New",
-      "cancelOrRejectReason": "None",
-      "executedBase": "0",
-      "executedQuoted": "0"
-    };
+    var newOrder = this.fillInSendingOrder(orderId, price, sizeBase, terms);
+    this.createOrReplaceMyOrder(newOrder);
+  }
+
+  createOrReplaceMyOrder = (order) => {
     this.setState((prevState, props) => {
+      let entry = {};
+      entry[order.orderId] = order;
       return {
-        myOrders: update(prevState.myOrders, {
-          orders: { $push: [newOrder] }
-        })
+        myOrders: update(prevState.myOrders, { $merge: entry })
       };
     });
   }
@@ -405,29 +487,34 @@ class App extends Component {
       this.handlePlaceOrderCallback(orderId, error, result);
     };
     this.bridge.submitCreateOrder(orderId, price, sizeBase, terms, callback);
-    var newOrder = {
-      "orderId": orderId,
-      "price": price,
-      "sizeBase": sizeBase,
-      "terms": terms,
-      "status": "New",
-      "cancelOrRejectReason": "None",
-      "executedBase": "0",
-      "executedQuoted": "0"
+    var newOrder = this.fillInSendingOrder(orderId, price, sizeBase, terms);
+    this.createOrReplaceMyOrder(newOrder);
+  }
+
+  fillInSendingOrder = (orderId, price, sizeBase, terms) => {
+    return {
+      orderId: orderId,
+      price: price,
+      sizeBase: sizeBase,
+      terms: terms,
+      status: "Sending",
+      reasonCode: "None",
+      rawExecutedBase: new BigNumber(0),
+      rawExecutedQuoted: new BigNumber(0),
+      rawFees: new BigNumber(0)
     };
-    this.setState((prevState, props) => {
-      return {
-        myOrders: update(prevState.myOrders, {
-          orders: { $push: [newOrder] }
-        })
-      };
-    });
   }
 
   handlePlaceOrderCallback = (orderId, error, result) => {
     console.log('might have placed order', orderId, error, result);
+    var existingOrder = this.state.myOrders[orderId];
+    if (error) {
+      this.createOrReplaceMyOrder(update(existingOrder, { status: { $set: "FailedSend" }}));
+    } else {
+      this.createOrReplaceMyOrder(update(existingOrder, { $merge: result }));
+    }
   }
-  
+
   render() {
     return (
       <div className="App">
@@ -569,6 +656,7 @@ class App extends Component {
               </Col>
               <Col md={4}>
                 <h3>Order Book</h3>
+                  {/* TODO - need max-height */}
                   <Table striped bordered condensed hover>
                     <thead>
                       <tr>
@@ -585,22 +673,6 @@ class App extends Component {
                       )}
                     </tbody>
                   </Table>
-                  <Well bsSize="sm" id="mid-price-box">
-                    Mid @ 0.00000126
-                    &nbsp;&nbsp;
-                  </Well>
-                  {/*
-                  <Table bordered condensed hover>
-                    <tbody>
-                      <tr>
-                        <td>Mid</td>
-                        <td>1.245</td>
-                        <td>Spread</td>
-                        <td>0.01</td>
-                      </tr>
-                    </tbody>
-                  </Table>
-                  */}
                   <Table striped bordered condensed hover>
                     <thead>
                       <tr>
@@ -633,8 +705,11 @@ class App extends Component {
                       </tr>
                     </thead>
                     <tbody>
-                      {this.state.marketTrades.trades.map((entry) =>
-                      <tr key={entry.makerOrderId + entry.takerOrderId}>
+                      {Object.keys(this.state.marketTrades)
+                        .sort(this.cmpMarketTradeIds)
+                        .map((marketTradeId) => this.state.marketTrades[marketTradeId])
+                        .map((entry) =>
+                      <tr key={entry.marketTradeId}>
                         <td>2 hours ago</td>
                         <td className="buy">{entry.makerPrice}</td>
                         <td>{entry.executedBase}</td>
@@ -677,7 +752,7 @@ class App extends Component {
                       <ControlLabel>Terms</ControlLabel>
                       <FormControl componentClass="select" placeholder="select">
                         <option value="GoodTillCancel">Good Till Cancel</option>
-                        <option value="GoodTillCancel">Good Till Cancel with Gas Top Up</option>
+                        <option value="GTCWithGasTopup">Good Till Cancel with Gas Top Up</option>
                         <option value="Immediate Or Cancel">Immediate Or Cancel</option>
                         <option value="MakerOnly">Maker Only</option>
                       </FormControl>
@@ -689,7 +764,7 @@ class App extends Component {
                         </Button>
                       </ButtonToolbar>
                       <HelpBlock>
-                        Order terms are explained at <a target="_blank" href="https://github.com/kieranelby/UbiTok.io/blob/master/docs/creating-orders.md">Creating Orders</a>.
+                        Please read our <a target="_blank" href="https://github.com/kieranelby/UbiTok.io/blob/master/docs/trading-rules.md">Trading Rules</a>.
                       </HelpBlock>
                     </FormGroup>
                   </Tab>
@@ -722,7 +797,7 @@ class App extends Component {
                       <ControlLabel>Terms</ControlLabel>
                       <FormControl componentClass="select" placeholder="select">
                         <option value="GoodTillCancel">Good Till Cancel</option>
-                        <option value="GoodTillCancel">Good Till Cancel with Gas Top Up</option>
+                        <option value="GTCWithGasTopup">Good Till Cancel with Gas Top Up</option>
                         <option value="Immediate Or Cancel">Immediate Or Cancel</option>
                         <option value="MakerOnly">Maker Only</option>
                       </FormControl>
@@ -734,7 +809,7 @@ class App extends Component {
                         </Button>
                       </ButtonToolbar>
                       <HelpBlock>
-                        Order terms are explained at <a target="_blank" href="https://github.com/kieranelby/UbiTok.io/blob/master/docs/creating-orders.md">Creating Orders</a>.
+                        Please read our <a target="_blank" href="https://github.com/kieranelby/UbiTok.io/blob/master/docs/trading-rules.md">Trading Rules</a>.
                       </HelpBlock>
                     </FormGroup>
                   </Tab>
@@ -754,14 +829,14 @@ class App extends Component {
                       </tr>
                     </thead>
                     <tbody>
-                      {this.state.myOrders.orders.map((entry) =>
+                      {this.getMySortedOrders().map((entry) =>
                       <tr key={entry.orderId}>
                         <td>5 mins ago</td>
                         {/* TODO - choose buy/sell */}
                         <td className="buy">{entry.price}</td>
                         <td>{entry.sizeBase}</td>
                         <td>{entry.status}</td>
-                        <td>{entry.executedBase}</td>
+                        <td>{this.formatBase(entry.rawExecutedBase)}</td>
                         <td>
                           <ButtonToolbar>
                             <Button bsSize="xsmall" bsStyle="info"><Glyphicon glyph="info-sign" title="more info" /></Button>

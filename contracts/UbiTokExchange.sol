@@ -20,7 +20,7 @@ contract UbiTokExchange {
     Done,
     NeedsGas, // TODO
     New, // web3 only
-    Sent, // web3 only
+    Sending, // web3 only
     FailedSend // web3 only
   }
 
@@ -93,6 +93,16 @@ contract UbiTokExchange {
   mapping (address => uint) balanceBaseForClient;
   mapping (address => uint) balanceQuotedForClient;
   
+  // TODO - fees
+  
+  uint feePpm = 500;
+  
+  uint feesRaisedBase;
+  uint feesRaisedCntr;
+  
+  mapping (address => uint) clientFeesRaisedBaseLastSweep;
+  mapping (address => uint) clientFeesRaisedCntrLastSweep;
+  
   mapping (uint128 => Order) orderForOrderId;
   
   // Effectively a compact mapping from uint16 pricePacked to bool occupied.
@@ -108,9 +118,9 @@ contract UbiTokExchange {
 
   // These allow a client to (reasonably) efficiently find their own orders
   // without relying on events (which even indexed are a bit expensive to search
-  // through months of blocks).
+  // and cannot be accessed from smart contracts). See walkOrders.
 
-  mapping (address => uint128) public mostRecentOrderIdForClient;
+  mapping (address => uint128) mostRecentOrderIdForClient;
   mapping (uint128 => uint128) clientPreviousOrderIdBeforeOrderId;
 
   function UbiTokExchange() {
@@ -136,9 +146,9 @@ contract UbiTokExchange {
 
   // Public Order View.
   //
-  function getOrder(uint128 orderId) public constant returns (address client, uint16 pricePacked, uint sizeBase, Terms terms, uint128 clientPrevOrderId) {
+  function getOrder(uint128 orderId) public constant returns (address client, uint16 pricePacked, uint sizeBase, Terms terms) {
     Order order = orderForOrderId[orderId];
-    return (order.client, order.pricePacked, order.sizeBase, order.terms, order.clientPrevOrderId);
+    return (order.client, order.pricePacked, order.sizeBase, order.terms);
   }
 
   // Public Order View.
@@ -146,6 +156,45 @@ contract UbiTokExchange {
   function getOrderState(uint128 orderId) public constant returns (Status status, CancelOrRejectReason cancelOrRejectReason, uint executedBase, uint executedQuoted) {
     Order order = orderForOrderId[orderId];
     return (order.status, order.cancelOrRejectReason, order.executedBase, order.executedQuoted);
+  }
+  
+  // Public Order View - enumerate all recent orders + all open orders.
+  //
+  // Not realy designed for use from a smart contract transaction.
+  //
+  // Idea is:
+  //  - client ensures order ids are generated so that most-signficant part is time-based;
+  //  - client decides they want all orders after a certain point-in-time, and chooses minClosedOrderIdCutoff accordingly;
+  //  - before that point-in-time they just get open and needs gas orders
+  //  - client calls walkOrders with maybeLastOrderIdReturned = 0 initially;
+  //  - then repeats with the orderId returned by walkOrders;
+  //  - (and stops if it returns a zero orderId);
+  //
+  function walkOrders(address client, uint128 maybeLastOrderIdReturned, uint128 minClosedOrderIdCutoff) public constant returns (
+      uint128 orderId, uint16 pricePacked, uint sizeBase, Terms terms, Status status, CancelOrRejectReason cancelOrRejectReason, uint executedBase, uint executedQuoted
+  ) {
+    if (maybeLastOrderIdReturned == 0) {
+      orderId = mostRecentOrderIdForClient[client];
+    } else {
+      Order lastOrder = orderForOrderId[maybeLastOrderIdReturned];
+      if (lastOrder.client == client) {
+        orderId = lastOrder.clientPrevOrderId;
+      }
+    }
+    while (true) {
+      if (orderId == 0) {
+        return;
+      }
+      Order order = orderForOrderId[orderId];
+      if (orderId >= minClosedOrderIdCutoff) {
+        break;
+      }
+      if (order.status == Status.Open || order.status == Status.NeedsGas) {
+        break;
+      }
+      orderId = order.clientPrevOrderId;
+    }
+    return (orderId, order.pricePacked, order.sizeBase, order.terms, order.status, order.cancelOrRejectReason, order.executedBase, order.executedQuoted);
   }
   
   // We pack direction and price into a crafty decimal floating point representation
@@ -159,13 +208,17 @@ contract UbiTokExchange {
   //   exponent - ranges from minimumPriceExponent to minimumPriceExponent + 11
   //              (e.g. -6 to +5 for a typical pair where minimumPriceExponent = -6)
   //
-  // The packed representation has 32001 different price values:
+  // The packed representation has 21601 different price values:
   //
   //      0  = invalid (can be used as marker value)
   //      1  = buy at maximum price (0.999 * 10 ** 6)
   //    ...  = other buy prices in descending order
+  //   5401  = buy at 1.00
+  //    ...  = other buy prices in descending order
   //  10800  = buy at minimum price (0.100 * 10 ** -5)
   //  10801  = sell at minimum price (0.100 * 10 ** -5)
+  //    ...  = other sell prices in descending order
+  //  16201  = sell at 1.00
   //    ...  = other sell prices in descending order
   //  21600  = sell at maximum price (0.999 * 10 ** 6)
   //  21601+ = do not use
@@ -179,7 +232,7 @@ contract UbiTokExchange {
   uint constant minSellPricePacked = 10801;
   uint constant maxSellPricePacked = 21600;
   
-  // Public Price Calculation.
+  // Public Price Calculation - turn friendlier unpacked price into a packed price as used for order placement.
   //
   function packPrice(Direction direction, uint16 mantissa, int8 exponent) public constant returns (uint16) {
     if (direction == Direction.Invalid) {
@@ -198,7 +251,7 @@ contract UbiTokExchange {
     return uint16(sidedPriceIndex);
   }
 
-  // Public Price Calculation.
+  // Public Price Calculation - turn packed price as used for order placement into a friendlier unpacked price.
   //
   function unpackPrice(uint16 pricePacked) public constant returns (Direction direction, uint16 mantissa, int8 exponent) {
     uint sidedPriceIndex = uint(pricePacked);
@@ -222,7 +275,7 @@ contract UbiTokExchange {
     return;
   }
   
-  // Public Price Calculation.
+  // Public Price Calculation - is a packed price on the buy side?
   //
   function isBuyPrice(uint16 validPricePacked) public constant returns (bool) {
     // TODO - could be much more efficient by keeping in packed form
@@ -236,7 +289,7 @@ contract UbiTokExchange {
     }
   }
   
-  // Public Price Calculation.
+  // Public Price Calculation - turn a backed buy price into a packed sell price of the same magnitude (or vice versa).
   //
   function oppositePackedPrice(uint16 pricePacked) public constant returns (uint16) {
     // TODO - this can be implemented much more efficiently by keeping in packed form
@@ -252,11 +305,17 @@ contract UbiTokExchange {
     return packPrice(oppositeDirection, mantissa, exponent);
   }
   
-  // Public Price Calculation.
+  // Public Price Calculation - compute amount in counter currency that would
+  // be obtained by selling baseAmount at the given unpacked price (if no fees).
+  //
+  // Notes:
+  //  - Could overflow producing very unexpected results if baseAmount very
+  //    large - caller must check this.
+  //  - This rounds the amount towards zero.
+  //  - May truncate to zero if baseAmount very small - potentially allowing
+  //    zero-cost buys or pointless sales - caller must check this.
   //
   function computeQuotedAmount(uint baseAmount, uint16 mantissa, int8 exponent) public constant returns (uint) {
-    // NB: danger of wrap-around overflow if baseAmount ridiculously large
-    // NB: danger of truncation to zero if baseAmount too small
     if (exponent < 0) {
       return baseAmount * uint(mantissa) / 1000 / 10 ** uint(-exponent);
     } else {
@@ -264,17 +323,25 @@ contract UbiTokExchange {
     }
   }
 
-  // Public Price Calculation.
+  // Public Price Calculation - compute amount in counter currency that would
+  // be obtained by selling baseAmount at the given packed price (if no fees).
+  //
+  // Notes:
+  //  - Direction of the packed price is ignored.
+  //  - Could overflow producing very unexpected results if baseAmount very
+  //    large - caller must check this.
+  //  - This rounds the amount towards zero.
+  //  - May truncate to zero if baseAmount very small - potentially allowing
+  //    zero-cost buys or pointless sales - caller must check this.
   //
   function computeQuotedAmountUsingPacked(uint baseAmount, uint16 pricePacked) public constant returns (uint) {
-    // NB: danger of wrap-around overflow if baseAmount ridiculously large
-    // NB: danger of truncation to zero if baseAmount too small
     var (, mantissa, exponent) = unpackPrice(pricePacked);
     return computeQuotedAmount(baseAmount, mantissa, exponent);
   }
   
   // Public Order Placement.
   //
+  // TODO - allow maxMatches to be passed in?
   //
   function createOrder(uint128 orderId, uint16 pricePacked, uint sizeBase, Terms terms) public {
     address client = msg.sender;
@@ -331,10 +398,10 @@ contract UbiTokExchange {
 
     if (order.executedBase > ourOriginalExecutedBase) {
       if (isBuyPrice(order.pricePacked)) {
-        Debug("taker got base", order.client, (order.executedBase - ourOriginalExecutedBase));
+        // TODO - deduct fees
         balanceBaseForClient[order.client] += (order.executedBase - ourOriginalExecutedBase);
       } else {
-        Debug("taker got quoted", order.client, (order.executedQuoted - ourOriginalExecutedQuoted));
+        // TODO - deduct fees
         balanceQuotedForClient[order.client] += (order.executedQuoted - ourOriginalExecutedQuoted);
       }
     }
@@ -597,11 +664,9 @@ contract UbiTokExchange {
     MarketOrderEvent(MarketOrderEventType.Trade, theirOrderId, theirPricePacked, matchBase);
     if (isBuyPrice(theirPricePacked)) {
       // they have bought base (using the quoted they already paid when creating the order)
-      Debug("maker got base", theirOrder.client, matchBase);
       balanceBaseForClient[theirOrder.client] += matchBase;
     } else {
       // they have bought quoted (using the base they already paid when creating the order)
-      Debug("maker got quoted", theirOrder.client, matchQuoted);
       balanceQuotedForClient[theirOrder.client] += matchQuoted;
     }
     // TODO - dust prevention (need to refund it tho)
@@ -690,6 +755,7 @@ contract UbiTokExchange {
   }
 
   // Intended for public book depth enumeration from web3 (or similar).
+  //
   // Not suitable for use from a smart contract transaction - gas usage
   // could be very high if we have many orders at the same price.
   //

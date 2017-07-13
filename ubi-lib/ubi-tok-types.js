@@ -1,4 +1,4 @@
-const BigDecimal = require('bignumber.js');
+const BigNumber = require('bignumber.js');
 const uuidv4 = require('uuid/v4');
 
 const enumTradableType = [
@@ -98,9 +98,10 @@ exports.decodeMarketOrderEventType = function (encodedMarketOrderEventType) {
 exports.decodeState = function (state) {
   return {
     status: exports.decodeStatus(state[0]),
-    rejectReason: exports.decodeRejectReason(state[1]),
-    executedBase: state[2],
-    executedQuoted: state[3]
+    reasonCode: exports.decodeRejectReason(state[1]),
+    rawExecutedBase: state[2],
+    rawExecutedQuoted: state[3],
+    rawFees: new BigNumber(0)
   };
 };
 
@@ -253,15 +254,18 @@ exports.splitFriendlyPrice = function(price)  {
 };
 
 exports.decodeAmount = function(amountWei, decimals) {
-  return new BigDecimal(amountWei).div('1e' + decimals).toFixed(null);
+  return new BigNumber(amountWei).div('1e' + decimals).toFixed(null);
 };
 
 exports.encodeAmount = function(friendlyAmount, decimals) {
-  return new BigDecimal(friendlyAmount).times('1e' + decimals);
+  return new BigNumber(friendlyAmount).times('1e' + decimals);
 };
 
 exports.decodeOrderId = (rawOrderId) => {
-  return 'R' + rawOrderId.toString(36);
+  // pad to allow string ordering comparison
+  // 128 bits needs 22 base36 digits
+  const padding = '0000000000000000000000';
+  return 'R' + (padding + rawOrderId.toString(36)).substr(-22);
 };
 
 exports.encodeOrderId = (friendlyOrderId) => {
@@ -269,13 +273,19 @@ exports.encodeOrderId = (friendlyOrderId) => {
     throw new Error('bad friendly order id');
   }
   var base36OrderId = friendlyOrderId.substr(1);
-  var numericOrderId = new BigDecimal(base36OrderId, 36);
+  var numericOrderId = new BigNumber(base36OrderId, 36);
   return numericOrderId;
 };
 
 exports.generateEncodedOrderId = () => {
-  let uuidWithoutDashes = uuidv4().replace(/-/g, '');
-  return new BigDecimal(uuidWithoutDashes, 16);
+  // want 128-bit number
+  // want to be able to order (for one client) by creation time
+  // want to avoid collisions between clients
+  // use client millis since epoch * 2^80 + 96 bits of client randomness
+  let millisSinceEpoch = (new Date()).getTime();
+  let fullUuidWithoutDashes = uuidv4().replace(/-/g, '');
+  let hex = millisSinceEpoch.toString(16) + fullUuidWithoutDashes.substr(-20);
+  return new BigNumber(hex, 16);
 };
 
 exports.generateDecodedOrderId = () => {
