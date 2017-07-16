@@ -9,10 +9,11 @@ export default class {
     this.chosenSupportedNetworkId = undefined;
     this.chosenSupportedNetworkName = undefined;
     this.chosenAccount = undefined;
+    this.initialBlockNumber = undefined;
     this.supportedNetworks = {
         "3": {
           name: "Ropsten Test Network",
-          bookContractAddress: "0x23b264782b7f34f59523ed0c79959666c15ad398"
+          bookContractAddress: "0xc31f82f4cd7f5a7dcb0a9e0921e5a25e9d7cabea"
         }
     };
     this.statusSubscribers = [];
@@ -58,10 +59,11 @@ export default class {
       this.chosenSupportedNetworkName = networkSettings.name;
       let bookContractAddress = networkSettings.bookContractAddress;
       const abiArray = 
-        [{"constant":true,"inputs":[{"name":"fromPricePacked","type":"uint16"}],"name":"walkBook","outputs":[{"name":"pricePacked","type":"uint16"},{"name":"depthBase","type":"uint256"},{"name":"blockNumber","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseTradableType","outputs":[{"name":"","type":"uint8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"pricePacked","type":"uint16"}],"name":"unpackPrice","outputs":[{"name":"direction","type":"uint8"},{"name":"mantissa","type":"uint16"},{"name":"exponent","type":"int8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"orderId","type":"uint128"}],"name":"getOrder","outputs":[{"name":"client","type":"address"},{"name":"pricePacked","type":"uint16"},{"name":"sizeBase","type":"uint256"},{"name":"terms","type":"uint8"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"client","type":"address"},{"name":"amountQuoted","type":"uint256"}],"name":"depositQuotedForTesting","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseMinInitialSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedTradableDisplayDecimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"orderId","type":"uint128"}],"name":"getOrderState","outputs":[{"name":"status","type":"uint8"},{"name":"cancelOrRejectReason","type":"uint8"},{"name":"executedBase","type":"uint256"},{"name":"executedQuoted","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseMinRemainingSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"pricePacked","type":"uint16"}],"name":"oppositePackedPrice","outputs":[{"name":"","type":"uint16"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"minimumPriceExponent","outputs":[{"name":"","type":"int8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"client","type":"address"}],"name":"getClientBalances","outputs":[{"name":"balanceBase","type":"uint256"},{"name":"balanceQuoted","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedMinRemainingSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"baseAmount","type":"uint256"},{"name":"mantissa","type":"uint16"},{"name":"exponent","type":"int8"}],"name":"computeQuotedAmount","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"baseAmount","type":"uint256"},{"name":"pricePacked","type":"uint16"}],"name":"computeQuotedAmountUsingPacked","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"direction","type":"uint8"},{"name":"mantissa","type":"uint16"},{"name":"exponent","type":"int8"}],"name":"packPrice","outputs":[{"name":"","type":"uint16"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"client","type":"address"},{"name":"amountBase","type":"uint256"}],"name":"depositBaseForTesting","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"orderId","type":"uint128"},{"name":"pricePacked","type":"uint16"},{"name":"sizeBase","type":"uint256"},{"name":"terms","type":"uint8"}],"name":"createOrder","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedMinInitialSize","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"client","type":"address"},{"name":"maybeLastOrderIdReturned","type":"uint128"},{"name":"minClosedOrderIdCutoff","type":"uint128"}],"name":"walkOrders","outputs":[{"name":"orderId","type":"uint128"},{"name":"pricePacked","type":"uint16"},{"name":"sizeBase","type":"uint256"},{"name":"terms","type":"uint8"},{"name":"status","type":"uint8"},{"name":"cancelOrRejectReason","type":"uint8"},{"name":"executedBase","type":"uint256"},{"name":"executedQuoted","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseTradableSymbol","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedTradableType","outputs":[{"name":"","type":"uint8"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"validPricePacked","type":"uint16"}],"name":"isBuyPrice","outputs":[{"name":"","type":"bool"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"baseTradableDisplayDecimals","outputs":[{"name":"","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"quotedTradableSymbol","outputs":[{"name":"","type":"string"}],"payable":false,"type":"function"},{"inputs":[],"payable":false,"type":"constructor"},{"anonymous":false,"inputs":[{"indexed":false,"name":"message","type":"string"},{"indexed":false,"name":"client","type":"address"},{"indexed":false,"name":"amount","type":"uint256"}],"name":"Debug","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"client","type":"address"},{"indexed":false,"name":"orderId","type":"uint128"}],"name":"ClientOrderCreated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"name":"marketOrderEventType","type":"uint8"},{"indexed":false,"name":"orderId","type":"uint128"},{"indexed":false,"name":"pricePacked","type":"uint16"},{"indexed":false,"name":"amountBase","type":"uint256"}],"name":"MarketOrderEvent","type":"event"}]
+        [{"constant":true,"inputs":[{"name":"fromPrice","type":"uint16"}],"name":"walkBook","outputs":[{"name":"price","type":"uint16"},{"name":"depthBase","type":"uint256"},{"name":"orderCount","type":"uint256"},{"name":"blockNumber","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"newAllowanceBase","type":"uint256"}],"name":"approveBase","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"orderId","type":"uint128"}],"name":"getOrder","outputs":[{"name":"client","type":"address"},{"name":"price","type":"uint16"},{"name":"sizeBase","type":"uint256"},{"name":"terms","type":"uint8"},{"name":"status","type":"uint8"},{"name":"reasonCode","type":"uint8"},{"name":"executedBase","type":"uint256"},{"name":"executedCntr","type":"uint256"},{"name":"fees","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"amountCntr","type":"uint256"}],"name":"withdrawCntr","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"_baseToken","type":"address"}],"name":"init","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[],"name":"getBookInfo","outputs":[{"name":"_bookType","type":"uint8"},{"name":"_baseToken","type":"address"},{"name":"_baseMinInitialSize","type":"uint256"},{"name":"_cntrToken","type":"address"},{"name":"_cntrMinInitialSize","type":"uint256"},{"name":"_feePpm","type":"uint256"},{"name":"_investorProxy","type":"address"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"newInvestorProxy","type":"address"}],"name":"changeInvestorProxy","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"orderId","type":"uint128"}],"name":"getOrderState","outputs":[{"name":"status","type":"uint8"},{"name":"reasonCode","type":"uint8"},{"name":"executedBase","type":"uint256"},{"name":"executedCntr","type":"uint256"},{"name":"fees","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"amountBase","type":"uint256"}],"name":"transferBase","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[],"name":"depositCntr","outputs":[],"payable":true,"type":"function"},{"constant":false,"inputs":[],"name":"transferFromBase","outputs":[],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"client","type":"address"}],"name":"getClientBalances","outputs":[{"name":"balanceBase","type":"uint256"},{"name":"balanceCntr","type":"uint256"}],"payable":false,"type":"function"},{"constant":true,"inputs":[{"name":"client","type":"address"},{"name":"maybeLastOrderIdReturned","type":"uint128"},{"name":"minClosedOrderIdCutoff","type":"uint128"}],"name":"walkClientOrders","outputs":[{"name":"orderId","type":"uint128"},{"name":"price","type":"uint16"},{"name":"sizeBase","type":"uint256"},{"name":"terms","type":"uint8"},{"name":"status","type":"uint8"},{"name":"reasonCode","type":"uint8"},{"name":"executedBase","type":"uint256"},{"name":"executedCntr","type":"uint256"},{"name":"fees","type":"uint256"}],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"orderId","type":"uint128"},{"name":"price","type":"uint16"},{"name":"sizeBase","type":"uint256"},{"name":"terms","type":"uint8"},{"name":"maxMatches","type":"uint256"}],"name":"createOrder","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"orderId","type":"uint128"},{"name":"maxMatches","type":"uint256"}],"name":"continueOrder","outputs":[],"payable":false,"type":"function"},{"constant":false,"inputs":[{"name":"orderId","type":"uint128"}],"name":"cancelOrder","outputs":[],"payable":false,"type":"function"},{"inputs":[],"payable":false,"type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"name":"client","type":"address"},{"indexed":false,"name":"clientPaymentEventType","type":"uint8"},{"indexed":false,"name":"baseOrCntr","type":"uint8"},{"indexed":false,"name":"clientBalanceDelta","type":"int256"}],"name":"ClientPaymentEvent","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"client","type":"address"},{"indexed":false,"name":"clientOrderEventType","type":"uint8"},{"indexed":false,"name":"orderId","type":"uint128"}],"name":"ClientOrderEvent","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"orderId","type":"uint128"},{"indexed":false,"name":"marketOrderEventType","type":"uint8"},{"indexed":false,"name":"price","type":"uint16"},{"indexed":false,"name":"amountBase","type":"uint256"}],"name":"MarketOrderEvent","type":"event"}]
       ;
       let BookContract = this.web3.eth.contract(abiArray);
       this.bookContract = BookContract.at(bookContractAddress);
+      this.web3.eth.getBlockNumber(this.handleBlockNumber);
     }
     let networkChanged = web3Present && this.chosenSupportedNetworkId !== undefined && networkId !== this.chosenSupportedNetworkId;
     var firstAccount = web3Present ? this.web3.eth.accounts[0] : undefined;
@@ -71,6 +73,7 @@ export default class {
       this.chosenAccount = firstAccount;
     }
     let accountChanged = web3Present && this.chosenAccount !== undefined && firstAccount !== this.chosenAccount;
+    let canMakePublicCalls = web3Present && !unsupportedNetwork && !networkChanged && this.initialBlockNumber;
     return {
       web3Present: web3Present,
       unsupportedNetwork: unsupportedNetwork,
@@ -79,9 +82,17 @@ export default class {
       chosenAccount: this.chosenAccount,
       accountLocked: accountLocked,
       accountChanged: accountChanged,
-      canMakePublicCalls: web3Present && !unsupportedNetwork && !networkChanged,
-      canMakeAccountCalls: web3Present && !unsupportedNetwork && !networkChanged && !accountLocked && !accountChanged
+      canMakePublicCalls: canMakePublicCalls,
+      canMakeAccountCalls: canMakePublicCalls && !accountLocked && !accountChanged
     };
+  }
+
+  handleBlockNumber = (error, result) => {
+    if (error) {
+      // TODO
+      return;
+    }
+    this.initialBlockNumber = result;
   }
 
   subscribeStatus = (callback) => {
@@ -171,16 +182,33 @@ export default class {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
-    // if no maybeLastOrderId, call mostRecentOrderIdForClient(our address)
-    // else call clientPreviousOrderIdBeforeOrderId(maybeLastOrderId)
-    // but we kinda want to call getOrder + getOrderState ?
-    // would we want a way to ignore completed/rejected ones?
-    // TODO
+    let now = new Date();
+    let recentCutoffDate = new Date(now.getTime() - 24 * 3600 * 1000);
+    let recentCutoffEncodedOrderId = UbiTokTypes.computeEncodedOrderId(recentCutoffDate, '0');
+    var encodedLastOrderId;
+    if (!maybeLastOrderId) {
+      encodedLastOrderId = UbiTokTypes.deliberatelyInvalidEncodedOrderId();
+    } else {
+      encodedLastOrderId = UbiTokTypes.encodeOrderId(maybeLastOrderId);
+    }
+    this.bookContract.walkClientOrders.call(this.getOurAddress(), encodedLastOrderId.valueOf(), recentCutoffEncodedOrderId.valueOf(),
+      callback
+    );
   }
   
   submitCreateOrder = (fmtOrderId, fmtPrice, fmtSizeBase, fmtTerms, callback) => {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
+    }
+    // TODO - come up with "clever" way of choosing maxMatches + gas
+    var maxMatches;
+    var gasAmount;
+    if (fmtTerms === 'MakerOnly') {
+      maxMatches = 0;
+      gasAmount = 300000;
+    } else {
+      maxMatches = 3;
+      gasAmount = 550000;
     }
     this.bookContract.createOrder.sendTransaction(
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
@@ -188,22 +216,25 @@ export default class {
       UbiTokTypes.encodePrice(fmtPrice).valueOf(),
       UbiTokTypes.encodeAmount(fmtSizeBase, this.baseDecimals).valueOf(),
       UbiTokTypes.encodeTerms(fmtTerms).valueOf(),
-      { from: this.getOurAddress(), gas: 500000 },
+      maxMatches,
+      { from: this.getOurAddress(), gas: gasAmount },
       (error, result) => {
-        this.handleOrderTxnHash(fmtOrderId, callback, error, result);
+        this.handleOrderTxnHash(fmtOrderId, 'Create', callback, error, result);
       }
     );
   }
 
-  handleOrderTxnHash = (fmtOrderId, orderCallback, error, txnHash) => {
+  handleOrderTxnHash = (fmtOrderId, verb, orderCallback, error, txnHash) => {
     if (error) {
+      // TODO - yeah but what if the error is that we lost network
+      // after submitting it! Perhaps be better just to poll orderId?
       orderCallback(error, undefined);
     } else {
-      this.handleOrderTxnReceipt(fmtOrderId, orderCallback, undefined, txnHash, undefined);
+      this.handleOrderTxnReceipt(fmtOrderId, verb, orderCallback, undefined, txnHash, undefined);
     }
   }
 
-  handleOrderTxnReceipt = (fmtOrderId, orderCallback, error, txnHash, maybeTxnReceipt) => {
+  handleOrderTxnReceipt = (fmtOrderId, verb, orderCallback, error, txnHash, maybeTxnReceipt) => {
     if (error) {
       orderCallback(error, undefined);
     } else {
@@ -212,7 +243,7 @@ export default class {
         setTimeout(() => {
           this.web3.eth.getTransactionReceipt(txnHash,
             (error2, result2) => {
-              this.handleOrderTxnReceipt(fmtOrderId, orderCallback, error2, txnHash, result2)
+              this.handleOrderTxnReceipt(fmtOrderId, verb, orderCallback, error2, txnHash, result2)
             });
           }, 5000
         );
@@ -224,16 +255,37 @@ export default class {
   }
   
   submitContinueOrder = (fmtOrderId, callback) => {
-
+    if (!this.checkCanMakeAccountCalls(callback)) {
+      return;
+    }
+    // TODO - come up with "clever" way of choosing maxMatches + gas
+    let maxMatches = 3;
+    let gasAmount = 550000;
+    this.bookContract.continueOrder.sendTransaction(
+      // TODO - valueOf is just to work around an annoying recent web3 bug ...
+      UbiTokTypes.encodeOrderId(fmtOrderId).valueOf(),
+      maxMatches,
+      { from: this.getOurAddress(), gas: gasAmount },
+      (error, result) => {
+        this.handleOrderTxnHash(fmtOrderId, 'Continue', callback, error, result);
+      }
+    );
   }
 
   submitCancelOrder = (fmtOrderId, callback) => {
-
-  }
-
-  // do we ever want this without state too?
-  getOrder = (fmtOrderId, callback) => {
-
+    if (!this.checkCanMakeAccountCalls(callback)) {
+      return;
+    }
+    // can't rely on estimate 'cos it can change based on other orders being placed ...
+    var gasAmount = 150000;
+    this.bookContract.cancelOrder.sendTransaction(
+      // TODO - valueOf is just to work around an annoying recent web3 bug ...
+      UbiTokTypes.encodeOrderId(fmtOrderId).valueOf(),
+      { from: this.getOurAddress(), gas: gasAmount },
+      (error, result) => {
+        this.handleOrderTxnHash(fmtOrderId, 'Cancel', callback, error, result);
+      }
+    );
   }
 
   getOrderState = (fmtOrderId, callback) => {
@@ -242,7 +294,7 @@ export default class {
       if (error) {
         callback(error, undefined);
       } else {
-        callback(undefined, UbiTokTypes.decodeState(result));
+        callback(undefined, UbiTokTypes.decodeOrderState(fmtOrderId, result));
       }
     });
   }
@@ -252,14 +304,7 @@ export default class {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
-    // TODO - optimise by starting from block where contract deployed
-    // perhaps still a bit expensive for metamask?
-    // or should we maintain a linked list in the contract of our orders?
-    var moreFilterOptions = {
-      fromBlock: 1000000
-    };
-    var filter = this.bookContract.ClientOrderCreated({client: this.getOurAddress()}, moreFilterOptions);
-    filter.get(callback);
+    // TODO
   }
 
   subscribeFutureMarketEvents = (callback) => {
@@ -267,12 +312,29 @@ export default class {
       return;
     }
     var filter = this.bookContract.MarketOrderEvent();
-    // TODO - should translate events ...
-    filter.watch(callback);
+    filter.watch((error, result) => {
+      if (error) {
+        return callback(error, undefined);
+      }
+      callback(undefined, UbiTokTypes.decodeMarketOrderEvent(result));
+    });
   }
 
-  getHistoricMarketTrades = (callback) => {
-    // TODO - last 50,000 blocks or something
+  getHistoricMarketEvents = (callback) => {
+    if (!this.checkCanMakePublicCalls(callback)) {
+      return;
+    }
+    var approxBlocksPerHour = 180;
+    var filter = this.bookContract.MarketOrderEvent({}, {
+      fromBlock: this.initialBlockNumber - (12 * approxBlocksPerHour)
+    });
+    filter.get((error, result) => {
+      if (error) {
+        return callback(error, undefined);
+      }
+      callback(undefined, result.map(
+        (rawEntry) => UbiTokTypes.decodeMarketOrderEvent(rawEntry)));
+    });
   }
 
 }

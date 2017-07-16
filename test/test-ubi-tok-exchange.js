@@ -1,4 +1,4 @@
-var UbiTokExchange = artifacts.require("UbiTokExchange");
+var UbiTokExchange = artifacts.require("BookERC20EthV1");
 
 var UbiTokTypes = require('../ubi-lib/ubi-tok-types.js');
 

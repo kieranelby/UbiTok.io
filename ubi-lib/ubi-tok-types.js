@@ -1,3 +1,7 @@
+/*
+ * Conversion functions for talking to the BookERC20EthV1 contract.
+*/
+
 const BigNumber = require('bignumber.js');
 const uuidv4 = require('uuid/v4');
 
@@ -18,15 +22,15 @@ const enumStatus = [
   'Open',
   'Done',
   'NeedsGas',
-  'New',
-  'Sent',
-  'FailedSend'
+  'Sending', // web3 only
+  'FailedSend' // web3 only
 ];
 
-const enumCancelOrRejectReason = [
+const enumReasonCode = [
   'None',
   'InvalidPrice',
   'InvalidSize',
+  'InvalidTerms',
   'InsufficientFunds',
   'WouldTake',
   'Unmatched',
@@ -35,16 +39,17 @@ const enumCancelOrRejectReason = [
 ];
 
 const enumTerms = [
-  'GoodTillCancel',
+  'GTCNoGasTopup',
+  'GTCWithGasTopup',
   'ImmediateOrCancel',
-  'MakerOnly',
-  'GTCWithGasTopup'
+  'MakerOnly'
 ];
 
 const enumMarketOrderEventType = [
   'Add',
   'Remove',
-  'Trade'
+  'CompleteFill',
+  'PartialFill'
 ];
 
 function encodeEnum(enumNamedValues, namedValue) {
@@ -83,29 +88,24 @@ exports.encodeTerms = function (termsName) {
   return encodeEnum(enumTerms, termsName);
 };
 
+exports.decodeTerms = function (encodedTerms) {
+  return decodeEnum(enumTerms, encodedTerms);
+};
+
 exports.decodeStatus = function (encodedStatus) {
   return decodeEnum(enumStatus, encodedStatus);
 };
 
-exports.decodeRejectReason = function (encodedRejectReason) {
-  return decodeEnum(enumCancelOrRejectReason, encodedRejectReason);
+exports.decodeReasonCode = function (encodedReasonCode) {
+  return decodeEnum(enumReasonCode, encodedReasonCode);
 };
 
 exports.decodeMarketOrderEventType = function (encodedMarketOrderEventType) {
   return decodeEnum(enumMarketOrderEventType, encodedMarketOrderEventType);
 };
 
-exports.decodeState = function (state) {
-  return {
-    status: exports.decodeStatus(state[0]),
-    reasonCode: exports.decodeRejectReason(state[1]),
-    rawExecutedBase: state[2],
-    rawExecutedQuoted: state[3],
-    rawFees: new BigNumber(0)
-  };
-};
-
-exports.minimumPriceExponent = -5; // should come from contract really?
+exports.baseDecimals = 18;
+exports.minimumPriceExponent = -5;
 exports.maxBuyPricePacked = 1;
 exports.minBuyPricePacked = 10800;
 exports.minSellPricePacked = 10801;
@@ -261,14 +261,22 @@ exports.encodeAmount = function(friendlyAmount, decimals) {
   return new BigNumber(friendlyAmount).times('1e' + decimals);
 };
 
-exports.decodeOrderId = (rawOrderId) => {
-  // pad to allow string ordering comparison
-  // 128 bits needs 22 base36 digits
-  const padding = '0000000000000000000000';
-  return 'R' + (padding + rawOrderId.toString(36)).substr(-22);
+exports.decodeBaseAmount = function(amountWei) {
+  return exports.decodeAmount(amountWei, exports.baseDecimals);
 };
 
-exports.encodeOrderId = (friendlyOrderId) => {
+exports.encodeBaseAmount = function(friendlyAmount, decimals) {
+  return exports.encodeAmount(friendlyAmount, exports.baseDecimals);
+};
+
+exports.decodeOrderId = function(rawOrderId) {
+  // pad to allow string ordering comparison
+  // 128 bits needs 25 base36 digits
+  const padding = '0000000000000000000000';
+  return 'R' + (padding + rawOrderId.toString(36)).substr(-25);
+};
+
+exports.encodeOrderId = function(friendlyOrderId) {
   if (!friendlyOrderId.startsWith('R')) {
     throw new Error('bad friendly order id');
   }
@@ -277,17 +285,73 @@ exports.encodeOrderId = (friendlyOrderId) => {
   return numericOrderId;
 };
 
-exports.generateEncodedOrderId = () => {
-  // want 128-bit number
-  // want to be able to order (for one client) by creation time
-  // want to avoid collisions between clients
-  // use client millis since epoch * 2^80 + 96 bits of client randomness
-  let millisSinceEpoch = (new Date()).getTime();
-  let fullUuidWithoutDashes = uuidv4().replace(/-/g, '');
-  let hex = millisSinceEpoch.toString(16) + fullUuidWithoutDashes.substr(-20);
+// See generateEncodedOrderId below.
+exports.computeEncodedOrderId = function(date, randomHex) {
+  let padding = '000000000000000000000000';
+  let secondsSinceEpoch = parseInt(date.getTime() / 1000);
+  let hex =
+      (padding + secondsSinceEpoch.toString(16)).substr(-8)
+    + (padding + randomHex).substr(-24);
   return new BigNumber(hex, 16);
 };
 
-exports.generateDecodedOrderId = () => {
+exports.generateEncodedOrderId = function() {
+  // Want to:
+  //  - minimise storage costs
+  //  - avoid collisions between clients
+  //  - sort by creation time (within the scope of one client!)
+  //  - extract creation time from order (for display to creator only!)
+  // So we:
+  //  - use client seconds since epoch (32bit) * 2^96 + 96 bits of client randomness
+  let date = new Date();
+  let fullUuidWithoutDashes = uuidv4().replace(/-/g, '');
+  return exports.computeEncodedOrderId(date, fullUuidWithoutDashes);
+};
+
+exports.generateDecodedOrderId = function() {
   return exports.decodeOrderId(exports.generateEncodedOrderId());
+};
+
+exports.deliberatelyInvalidEncodedOrderId = function() {
+  return new BigNumber(0);
+};
+
+// Suitable for use with walkClientOrders().
+exports.decodeWalkClientOrder = function (order) {
+  return {
+    orderId: exports.decodeOrderId(order[0]),
+    price: exports.decodePrice(order[1]),
+    sizeBase: exports.decodeBaseAmount(order[2]),
+    terms: exports.decodeTerms(order[3]),
+    status: exports.decodeStatus(order[4]),
+    reasonCode: exports.decodeReasonCode(order[5]),
+    rawExecutedBase: order[6],
+    rawExecutedQuoted: order[7],
+    rawFees: order[8]
+  };
+};
+
+// Suitable for use with getOrderState().
+exports.decodeOrderState = function (orderId, state) {
+  return {
+    orderId: orderId,
+    status: exports.decodeStatus(state[0]),
+    reasonCode: exports.decodeReasonCode(state[1]),
+    rawExecutedBase: state[2],
+    rawExecutedQuoted: state[3],
+    rawFees: state[4]
+  };
+};
+
+// Suitable for use with a callback from an eth.filter watching for MarketOrderEvent.
+exports.decodeMarketOrderEvent = function(result) {
+  return {
+      blockNumber: result.blockNumber,
+      logIndex: result.logIndex,
+      eventRemoved: result.removed,
+      marketOrderEventType: exports.decodeMarketOrderEventType(result.args.marketOrderEventType),
+      orderId: exports.decodeOrderId(result.args.orderId),
+      pricePacked: result.args.price.toNumber(),
+      rawAmountBase: result.args.amountBase
+  };
 };

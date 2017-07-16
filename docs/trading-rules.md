@@ -57,19 +57,19 @@ This mostly affects very large orders at a generous price - the exchange UI will
 
 # Fees
 
-A fee of 0.05% of the matched amount is deducted from the amount the taker receive from each trade. For buy orders, the fee is in the base currency; for sell orders it is in the counter currency. The maker (provider of liquidity) pays no fees.
+A fee of 0.05% of the matched amount is deducted from the amount the taker receives from each trade. For buy orders, the fee is in the base currency; for sell orders it is in the counter currency. The maker (provider of liquidity) pays no fees.
 
 Example 1: The FOO/ETH Book has an offer to sell 10,000 FOO @ 1.50. You place an order to buy 2000 FOO @ 1.50, which costs you 3000 ETH. You are the taker on this trade, so you pay a fee of 1 FOO (0.05% of 2000) and receive the remaining 1999 FOO.
 
 Example 2: You place an order to buy 200 FOO @ 1.50, which costs you 300 ETH. It is not matched and rests on the book. Another client places an order to sell 1000 FOO @ 1.50, of which 200 FOO (300 ETH) can be matched with you. They are the taker, so they pay a fee of 0.15 ETH (0.05% of 300), and receive the remaining 299.85 ETH. You receive the full 200 FOO.
 
-Fees paid by traders are held in the book contract and can be withdrawn by UBI token holders in proportion to their UBI holdings at the time of withdrawal.
+Fees paid by traders are held in the book contract and are periodically distributed to investors.
 
 ### Order Lifecycle
 
 Orders have a Status, which can be one of:
 
-- New - Your order is being sent via the Ethereum network to the exchange contract;
+- Sending - Your order is being sent via the Ethereum network to the exchange contract;
 - Failed Send - Your order could not be sent to the exchange contract;
 - Rejected - The exchange contract could not place your order (e.g. size too small);
 - Needs Gas - See Gas Top Up section;

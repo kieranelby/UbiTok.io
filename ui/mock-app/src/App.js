@@ -26,16 +26,16 @@ function MyNavForm(props) {
 class App extends Component {
   constructor(props) {
     super(props);
-    // should be per-network, perhaps we do need a depth query
-    this.lastBookSnapshot = {
-      blockId: 100000,
-      depthByPrice: {}
-    };
+
     this.bridge = new Bridge();
     this.lastBridgeStatus = this.bridge.getInitialStatus();
+
+    // pricePacked -> [rawDepth, orderCount, blockNumber]
     this.internalBook = new Map();
     this.internalBookWalked = false;
+
     this.marketEventQueue = [];
+
     this.state = {
 
       // are we connected to Ethereum network? which network? what account?
@@ -141,6 +141,7 @@ class App extends Component {
 
       "myOrders": {
       },
+      "myOrdersLoaded": false,
 
       // Trades that have happened in the market (keyed by something unique).
       // Example:
@@ -200,7 +201,7 @@ class App extends Component {
   }
 
   formatBase = (amount) => {
-    return UbiTokTypes.decodeAmount(amount, 18);
+    return UbiTokTypes.decodeBaseAmount(amount);
   }
 
   handleStatusUpdate = (error, newBridgeStatus) => {
@@ -222,26 +223,29 @@ class App extends Component {
   readPublicData = () => {
     this.bridge.subscribeFutureMarketEvents(this.handleMarketEvent);
     this.startWalkBook();
+    this.bridge.getHistoricMarketEvents(this.handleHistoricMarketEvents);
   }
 
   readAccountData = () => {
-    this.bridge.getAllOrderIds(this.handleHistoricClientOrderCreated);
+    this.bridge.walkMyOrders(undefined, this.handleWalkMyOrdersCallback);
   }
 
-  handleMarketEvent = (error, result) => {
+  handleHistoricMarketEvents = (error, events) => {
     if (error) {
       this.panic(error);
       return;
     }
-    let event = {
-      blockNumber: result.blockNumber,
-      logIndex: result.logIndex,
-      eventRemoved: result.removed,
-      marketOrderEventType: UbiTokTypes.decodeMarketOrderEventType(result.args.marketOrderEventType),
-      orderId: UbiTokTypes.decodeOrderId(result.args.orderId),
-      pricePacked: result.args.pricePacked.toNumber(),
-      amountBase: result.args.amountBase
-    };
+    for (let event of events) {
+      this.addMarketTradeFromEvent(event);
+    }
+    // TODO - make loading spinner disappear
+  }
+
+  handleMarketEvent = (error, event) => {
+    if (error) {
+      this.panic(error);
+      return;
+    }
     console.log('handleMarketEvent', event);
     this.marketEventQueue.push(event);
     this.consumeQueuedMarketEvents();
@@ -252,35 +256,51 @@ class App extends Component {
       return;
     }
     for (let event of this.marketEventQueue) {
-      let entry = this.internalBook.has(event.pricePacked) ? this.internalBook.get(event.pricePacked) : [new BigNumber(0), 0];
-      // TODO - probably want to fire off status update if this is one of our orders?
-      // (but how do we know when a taker order gets mined?)
-      // update internal book
-      if (event.blockNumber > entry[1]) {
-        if (event.marketOrderEventType === 'Add') {
-          entry[0] = entry[0].add(event.amountBase);
-          entry[1] = event.blockNumber;
-        } else if (event.marketOrderEventType === 'Remove' || event.marketOrderEventType === 'Trade') {
-          entry[0] = entry[0].minus(event.amountBase);
-          entry[1] = event.blockNumber;
-        }
-      }
-      this.internalBook.set(event.pricePacked, entry);
-      // update market trades
-      if (event.marketOrderEventType === 'Trade') {
-        // could simplify by making this naturally sortable?
-        this.addMarketTrade({
-          marketTradeId: "" + event.blockNumber + "-" + event.logIndex,
-          blockNumber: event.blockNumber,
-          logIndex: event.logIndex,
-          makerOrderId: event.orderId,
-          makerPrice: UbiTokTypes.decodePrice(event.pricePacked),
-          executedBase: this.formatBase(event.amountBase),
+      if (this.isInMyOrders(event.orderId)) {
+        this.bridge.getOrderState(event.orderId, (error, result) => {
+          this.updateMyOrder(event.orderId, result);
         });
       }
+      this.updateInternalBookFromEvent(event);
+      this.addMarketTradeFromEvent(event);
     }
     this.marketEventQueue = [];
     this.updatePublicBook();
+  }
+
+  updateInternalBookFromEvent = (event) => {
+    // [rawDepth, orderCount, blockNumber]
+    let entry = this.internalBook.has(event.pricePacked) ? this.internalBook.get(event.pricePacked) : [new BigNumber(0), 0, 0];
+    if (event.blockNumber > entry[2]) {
+      if (event.marketOrderEventType === 'Add') {
+        entry[0] = entry[0].add(event.rawAmountBase);
+        entry[1] = entry[1] + 1;
+        entry[2] = event.blockNumber;
+      } else if ( event.marketOrderEventType === 'Remove' ||
+                  event.marketOrderEventType === 'PartialFill' ||
+                  event.marketOrderEventType === 'CompleteFill' ) {
+        entry[0] = entry[0].minus(event.rawAmountBase);
+        if (event.marketOrderEventType !== 'PartialFill') {
+          entry[1] = entry[1] - 1;
+        }
+        entry[2] = event.blockNumber;
+      }
+    }
+    this.internalBook.set(event.pricePacked, entry);
+  }
+
+  addMarketTradeFromEvent = (event) => {
+    if (event.marketOrderEventType === 'PartialFill' || event.marketOrderEventType === 'CompleteFill') {
+      // could simplify by making this naturally sortable?
+      this.addMarketTrade({
+        marketTradeId: "" + event.blockNumber + "-" + event.logIndex,
+        blockNumber: event.blockNumber,
+        logIndex: event.logIndex,
+        makerOrderId: event.orderId,
+        makerPrice: UbiTokTypes.decodePrice(event.pricePacked),
+        executedBase: this.formatBase(event.rawAmountBase),
+      });
+    }
   }
 
   addMarketTrade = (marketTrade) => {
@@ -296,7 +316,7 @@ class App extends Component {
   startWalkBook = () => {
     console.log('startWalkBook ...');
     this.internalBook.clear();
-    this.bridge.walkBook(1, this.handleWalkBook);    
+    this.bridge.walkBook(1, this.handleWalkBook);
   }
 
   handleWalkBook = (error, result) => {
@@ -307,11 +327,12 @@ class App extends Component {
     }
     var pricePacked = result[0].toNumber();
     var depth = result[1];
-    var blockNumber = result[2].toNumber();
+    var orderCount = result[2].toNumber();
+    var blockNumber = result[3].toNumber();
     var nextPricePacked;
     var done = false;
     if (!depth.isZero()) {
-      this.internalBook.set(pricePacked, [depth, blockNumber]);
+      this.internalBook.set(pricePacked, [depth, orderCount, blockNumber]);
       if (pricePacked === UbiTokTypes.minSellPricePacked) {
         done = true;
       } else {
@@ -338,15 +359,16 @@ class App extends Component {
     for (let entry of sortedEntries) {
       let pricePacked = entry[0];
       let rawDepth = entry[1][0];
+      let orderCount = entry[1][1];
       if (rawDepth.comparedTo(0) <= 0) {
         continue;
       }
       let friendlyDepth = this.formatBase(rawDepth);
       let price = UbiTokTypes.decodePrice(pricePacked);
       if (pricePacked <= UbiTokTypes.minBuyPricePacked) {
-        bids.push([price, friendlyDepth]);
+        bids.push([price, friendlyDepth, orderCount]);
       } else {
-        asks.push([price, friendlyDepth]);
+        asks.push([price, friendlyDepth, orderCount]);
       }
     }
     asks.reverse();
@@ -368,8 +390,21 @@ class App extends Component {
     this.consumeQueuedMarketEvents();
   }
 
-  handleHistoricClientOrderCreated = (error, result) => {
-    console.log('handleHistoricClientOrderCreated', error, result);
+  handleWalkMyOrdersCallback = (error, result) => {
+    if (error) {
+      return this.panic(error);
+    }
+    var order = UbiTokTypes.decodeWalkClientOrder(result);
+    if (order.status === "Unknown") {
+      this.setState((prevState, props) => {
+        return {
+          myOrdersLoaded: update(prevState.myOrdersLoaded, {$set: true})
+        };
+      });
+    } else {
+      this.createMyOrder(order);
+      this.bridge.walkMyOrders(order.orderId, this.handleWalkMyOrdersCallback);
+    }
   }
 
   pollExchangeBalances = () => {
@@ -459,38 +494,53 @@ class App extends Component {
     var orderId = UbiTokTypes.generateDecodedOrderId();
     var price = "Buy @ " + this.state.createOrder.buy.price;
     var sizeBase = this.state.createOrder.buy.amountBase;
-    var terms = 'GoodTillCancel';
+    var terms = 'GTCNoGasTopup'; // TODO - take from form!
     let callback = (error, result) => {
       this.handlePlaceOrderCallback(orderId, error, result);
     };
     this.bridge.submitCreateOrder(orderId, price, sizeBase, terms, callback);
     var newOrder = this.fillInSendingOrder(orderId, price, sizeBase, terms);
-    this.createOrReplaceMyOrder(newOrder);
-  }
-
-  createOrReplaceMyOrder = (order) => {
-    this.setState((prevState, props) => {
-      let entry = {};
-      entry[order.orderId] = order;
-      return {
-        myOrders: update(prevState.myOrders, { $merge: entry })
-      };
-    });
+    this.createMyOrder(newOrder);
   }
 
   handlePlaceSellOrder = (e) => {
     var orderId = UbiTokTypes.generateDecodedOrderId();
     var price = "Sell @ " + this.state.createOrder.sell.price;
     var sizeBase = this.state.createOrder.sell.amountBase;
-    var terms = 'GoodTillCancel';
+    var terms = 'GTCNoGasTopup'; // TODO - take from form!
     let callback = (error, result) => {
       this.handlePlaceOrderCallback(orderId, error, result);
     };
     this.bridge.submitCreateOrder(orderId, price, sizeBase, terms, callback);
     var newOrder = this.fillInSendingOrder(orderId, price, sizeBase, terms);
-    this.createOrReplaceMyOrder(newOrder);
+    this.createMyOrder(newOrder);
   }
 
+  isInMyOrders = (orderId) => {
+    return this.state.myOrders.hasOwnProperty(orderId);
+  }
+
+  createMyOrder = (order) => {
+    let sourceObject = {};
+    sourceObject[order.orderId] = order;
+    this.setState((prevState, props) => {
+      return {
+        myOrders: update(prevState.myOrders, {$merge: sourceObject})
+      };
+    });
+  }
+
+  updateMyOrder = (orderId, partialOrder) => {
+    let query = {};
+    query[orderId] = { $merge: partialOrder };
+    this.setState((prevState, props) => {
+      return {
+        myOrders: update(prevState.myOrders, query)
+      };
+    });
+  }
+  
+  // TODO - move to UbiTokTypes?
   fillInSendingOrder = (orderId, price, sizeBase, terms) => {
     return {
       orderId: orderId,
@@ -507,14 +557,43 @@ class App extends Component {
 
   handlePlaceOrderCallback = (orderId, error, result) => {
     console.log('might have placed order', orderId, error, result);
-    var existingOrder = this.state.myOrders[orderId];
     if (error) {
-      this.createOrReplaceMyOrder(update(existingOrder, { status: { $set: "FailedSend" }}));
+      // TODO - but could have been placed despite error?
+      this.updateMyOrder(orderId, { status: "FailedSend" });
     } else {
-      this.createOrReplaceMyOrder(update(existingOrder, { $merge: result }));
+      this.updateMyOrder(orderId, result);
     }
   }
 
+  handleModifyOrderCallback = (orderId, error, result) => {
+    console.log('might have done something to order', orderId, error, result);
+    var existingOrder = this.state.myOrders[orderId];
+    if (error) {
+      // todo - wot
+    } else {
+      this.updateMyOrder(orderId, result);
+    }
+  }
+  
+  handleClickMoreInfo = (orderId) => {
+    // TODO - some sort of dialog or expandy thing
+  }
+
+  handleClickCancelOrder = (orderId) => {
+    // TODO - think we should have a better mechanism for this
+    let callback = (error, result) => {
+      this.handleModifyOrderCallback(orderId, error, result);
+    };
+    this.bridge.submitCancelOrder(orderId, callback);
+  }
+
+  handleClickContinueOrder = (orderId) => {
+    let callback = (error, result) => {
+      this.handleModifyOrderCallback(orderId, error, result);
+    };
+    this.bridge.submitContinueOrder(orderId, callback);
+  }
+  
   render() {
     return (
       <div className="App">
@@ -662,6 +741,7 @@ class App extends Component {
                       <tr>
                         <th>Ask Price</th>
                         <th>Depth ({this.state.pairInfo.base.symbol})</th>
+                        <th>Count</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -669,6 +749,7 @@ class App extends Component {
                       <tr key={entry[0]}>
                         <td className="sell">{entry[0]}</td>
                         <td>{entry[1]}</td>
+                        <td>{entry[2]}</td>
                       </tr>
                       )}
                     </tbody>
@@ -678,6 +759,7 @@ class App extends Component {
                       <tr>
                         <th>Bid Price</th>
                         <th>Depth ({this.state.pairInfo.base.symbol})</th>
+                        <th>Count</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -685,6 +767,7 @@ class App extends Component {
                       <tr key={entry[0]}>
                         <td className="buy">{entry[0]}</td>
                         <td>{entry[1]}</td>
+                        <td>{entry[2]}</td>
                       </tr>
                       )}
                     </tbody>
@@ -751,7 +834,7 @@ class App extends Component {
                       </HelpBlock>
                       <ControlLabel>Terms</ControlLabel>
                       <FormControl componentClass="select" placeholder="select">
-                        <option value="GoodTillCancel">Good Till Cancel</option>
+                        <option value="GTCNoGasTopup">Good Till Cancel</option>
                         <option value="GTCWithGasTopup">Good Till Cancel with Gas Top Up</option>
                         <option value="Immediate Or Cancel">Immediate Or Cancel</option>
                         <option value="MakerOnly">Maker Only</option>
@@ -796,7 +879,7 @@ class App extends Component {
                       </HelpBlock>
                       <ControlLabel>Terms</ControlLabel>
                       <FormControl componentClass="select" placeholder="select">
-                        <option value="GoodTillCancel">Good Till Cancel</option>
+                        <option value="GTCNoGasTopup">Good Till Cancel</option>
                         <option value="GTCWithGasTopup">Good Till Cancel with Gas Top Up</option>
                         <option value="Immediate Or Cancel">Immediate Or Cancel</option>
                         <option value="MakerOnly">Maker Only</option>
@@ -839,9 +922,19 @@ class App extends Component {
                         <td>{this.formatBase(entry.rawExecutedBase)}</td>
                         <td>
                           <ButtonToolbar>
-                            <Button bsSize="xsmall" bsStyle="info"><Glyphicon glyph="info-sign" title="more info" /></Button>
-                            <Button bsSize="xsmall" bsStyle="danger"><Glyphicon glyph="remove" title="cancel order" /></Button>
-                            {/*<Button bsSize="xsmall" bsStyle="primary">Continue</Button>*/}
+                            <Button bsSize="xsmall" bsStyle="info" onClick={() => this.handleClickMoreInfo(entry.orderId)}>
+                              <Glyphicon glyph="info-sign" title="more info" />
+                            </Button>
+                            { (entry.status === 'Open' || entry.status === 'NeedsGas') ? (
+                            <Button bsSize="xsmall" bsStyle="danger" onClick={() => this.handleClickCancelOrder(entry.orderId)}>
+                              <Glyphicon glyph="remove" title="cancel order" />
+                            </Button>
+                            ) : undefined }
+                            { (entry.status === 'NeedsGas') ? (
+                            <Button bsSize="xsmall" bsStyle="danger" onClick={() => this.handleClickContinueOrder(entry.orderId)}>
+                              <Glyphicon glyph="remove" title="cancel order" />
+                            </Button>
+                            ) : undefined }
                           </ButtonToolbar>
                         </td>
                       </tr>
