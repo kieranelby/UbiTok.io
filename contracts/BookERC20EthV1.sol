@@ -53,7 +53,9 @@ contract BookERC20EthV1 {
     ImmediateOrCancel,
     MakerOnly
   }
-  
+
+  // TODO - consider saving gas costs by using uint128 for monetary amounts in order storage?
+
   struct Order {
     // these are immutable once placed:
 
@@ -66,8 +68,8 @@ contract BookERC20EthV1 {
     
     Status status;
     ReasonCode reasonCode;
-    uint executedBase;      // gross amount executed (that is, before fee deduction)
-    uint executedCntr;      // gross amount executed (that is, before fee deduction)
+    uint executedBase;      // gross amount executed in base currency (before fee deduction)
+    uint executedCntr;      // gross amount executed in counter currency (before fee deduction)
     uint fees;              // fees charged in base for a buy order, in counter for a sell order
   }
   
@@ -286,7 +288,9 @@ contract BookERC20EthV1 {
     address book = address(this);
     uint amountBase = baseToken.allowance(client, book);
     require(amountBase > 0);
+    // TODO - what about older ERC20 tokens that don't return bool?
     require(baseToken.transferFrom(client, book, amountBase));
+    // belt and braces
     assert(baseToken.allowance(client, book) == 0);
     balanceBaseForClient[client] += amountBase;
     ClientPaymentEvent(client, ClientPaymentEventType.TransferFrom, BaseOrCntr.Base, int(amountBase));
@@ -299,6 +303,7 @@ contract BookERC20EthV1 {
     require(amountBase > 0);
     require(amountBase <= balanceBaseForClient[client]);
     balanceBaseForClient[client] -= amountBase;
+    // TODO - what about older ERC20 tokens that don't return bool?
     require(baseToken.transfer(client, amountBase));
     ClientPaymentEvent(client, ClientPaymentEventType.Transfer, BaseOrCntr.Base, -int(amountBase));
   }
@@ -316,14 +321,19 @@ contract BookERC20EthV1 {
       amountBase = newAllowanceBase - oldAllowanceBase;
       require(amountBase <= balanceBaseForClient[client]);
       balanceBaseForClient[client] -= amountBase;
+      // TODO - what about older ERC20 tokens that don't return bool?
       require(baseToken.approve(client, newAllowanceBase));
+      // belt and braces
       assert(baseToken.allowance(book, client) == newAllowanceBase);
       ClientPaymentEvent(client, ClientPaymentEventType.Approve, BaseOrCntr.Base, -int(amountBase));
     } else if (newAllowanceBase == oldAllowanceBase) {
       return;
     } else {
       amountBase = oldAllowanceBase - newAllowanceBase;
+      // TODO - what about older ERC20 tokens that don't return bool?
+      // TODO - some ERC20 tokens only allow 0 <-> non-zero transitions
       require(baseToken.approve(client, newAllowanceBase));
+      // belt and braces
       assert(baseToken.allowance(book, client) == newAllowanceBase);
       balanceBaseForClient[client] += amountBase;
       ClientPaymentEvent(client, ClientPaymentEventType.Approve, BaseOrCntr.Base, int(amountBase));
@@ -505,9 +515,7 @@ contract BookERC20EthV1 {
       uint128 orderId, uint16 price, uint sizeBase, Terms terms, uint maxMatches
     ) public {
     address client = msg.sender;
-    if (client == 0 || orderId == 0 || orderForOrderId[orderId].client != 0) {
-      throw;
-    }
+    require(client != 0 && orderId != 0 || orderForOrderId[orderId].client == 0);
     ClientOrderEvent(client, ClientOrderEventType.Create, orderId);
     orderForOrderId[orderId] =
       Order(client, price, sizeBase, terms, Status.Unknown, ReasonCode.None, 0, 0, 0);
@@ -568,9 +576,7 @@ contract BookERC20EthV1 {
   function continueOrder(uint128 orderId, uint maxMatches) public {
     address client = msg.sender;
     Order order = orderForOrderId[orderId];
-    if (order.client != client) {
-      throw;
-    }
+    require(order.client == client);
     if (order.status != Status.NeedsGas) {
       return;
     }
@@ -615,6 +621,8 @@ contract BookERC20EthV1 {
 
   // Internal Order Placement - process a created and sanity checked order.
   //
+  // Used both for new orders and for gas topup.
+  //
   function processOrder(uint128 orderId, uint maxMatches) internal {
     Order order = orderForOrderId[orderId];
 
@@ -632,6 +640,7 @@ contract BookERC20EthV1 {
     if (isBuyPrice(order.price)) {
       liquidityTaken = (order.executedBase - ourOriginalExecutedBase);
       if (liquidityTaken > 0) {
+        // overflow safe since size capped at 2**127
         fees = liquidityTaken * feePpm / 1000000;
         balanceBaseForClient[order.client] += (liquidityTaken - fees);
         order.fees += fees;
@@ -709,6 +718,8 @@ contract BookERC20EthV1 {
   // Only updates the executedBase and executedCntr of the given order - caller is responsible
   // for crediting matched funds, charging fees, marking order as done / entering it into the book.
   //
+  // matchStopReason returned will be one of MaxMatches, Satisfied or BookExhausted.
+  //
   function matchAgainstBook(
       uint128 orderId, uint theirPriceStart, uint theirPriceEnd, uint maxMatches
     ) internal returns (
@@ -760,6 +771,8 @@ contract BookERC20EthV1 {
       }
     }
     if (matchStopReason == MatchStopReason.None) {
+      // we've reached the last bitmap we need to search,
+      // we'll stop at btiEnd not 256 this time.
       while (bti <= btiEnd && wbm != 0) {
         if ((wbm & 1) != 0) {
           // careful - copy-and-pasted in loop above ...
@@ -778,7 +791,9 @@ contract BookERC20EthV1 {
         wbm /= 2;
       }
     }
-    // careful - have to do this if broke out of first loop with a match stop reason ...
+    // Careful - if we exited the first loop early, or we went into the second loop,
+    // (luckily can't both happen) then we haven't flushed the dirty bitmap back to
+    // storage - do that now if we need to.
     if (dbm != cbm) {
       occupiedPriceBitmaps[bmi] = dbm;
     }
@@ -1079,6 +1094,7 @@ contract BookERC20EthV1 {
         wbm /= 2;
       }
     }
+    // we've reached the last bitmap we need to search, stop at btiEnd not 256 this time.
     while (bti <= btiEnd && wbm != 0) {
       if ((wbm & 1) != 0) {
         // careful - copy-pasted in above loop

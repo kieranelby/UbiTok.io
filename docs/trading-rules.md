@@ -55,7 +55,7 @@ If Allow Gas Top-Up is enabled, and there are so many matching orders in the boo
 
 This mostly affects very large orders at a generous price - the exchange UI will warn you if your order looks like it may be expensive to match, and suggest enabling gas-top up.
 
-# Fees
+### Fees
 
 A fee of 0.05% of the matched amount is deducted from the amount the taker receives from each trade. For buy orders, the fee is in the base currency; for sell orders it is in the counter currency. The maker (provider of liquidity) pays no fees.
 
