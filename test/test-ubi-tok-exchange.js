@@ -1,186 +1,53 @@
-var UbiTokExchange = artifacts.require("BookERC20EthV1");
+var BookERC20EthV1 = artifacts.require('BookERC20EthV1.sol');
+var TestToken = artifacts.require('TestToken.sol');
 
 var UbiTokTypes = require('../ubi-lib/ubi-tok-types.js');
+var BigNumber = UbiTokTypes.BigNumber;
 
-contract('UbiTokExchange', function(accounts) {
-
-  it("should return invalid packed price when packing out-of-range prices", function() {
-    var examples = [
-      [UbiTokTypes.encodeDirection("Invalid"),  500,   2, "invalid direction"],
-      [UbiTokTypes.encodeDirection("Buy"),       99,   2, "buy mantissa too small"],
-      [UbiTokTypes.encodeDirection("Buy"),     1000,   2, "buy mantissa too large"],
-      [UbiTokTypes.encodeDirection("Buy"),      500,  -9, "buy exponent too small"],
-      [UbiTokTypes.encodeDirection("Buy"),      500,  10, "buy exponent too large"],
-      [UbiTokTypes.encodeDirection("Sell"),      99,   2, "sell mantissa too small"],
-      [UbiTokTypes.encodeDirection("Sell"),    1000,   2, "sell mantissa too large"],
-      [UbiTokTypes.encodeDirection("Sell"),     500,  -9, "sell exponent too small"],
-      [UbiTokTypes.encodeDirection("Sell"),     500,  10, "sell exponent too large"]
-    ];
-    return UbiTokExchange.deployed().then(function(instance) {
-      return Promise.all(examples.map(function(example) {
-        return instance.packPrice.call(example[0],example[1],example[2]);
-      }));
-    }).then(function(results) {
-      examples.forEach(function (example, index) {
-        var result = results[index];
-        assert.equal(result.valueOf(), UbiTokTypes.encodeDirection('Invalid'), example[3]);
-      });
-    });
-  });
-
-  it("should detect invalid packed prices when unpacking prices", function() {
-    var examples = [
-	  [    0, "marker value for invalid price"],
-	  [21601, "just beyond max sell"],
-	  [32767, "max 15-bit"],
-	  [32768, "special in binary"],
-	  [65535, "could be treated as -1"]
-    ];
-    return UbiTokExchange.deployed().then(function(instance) {
-      return Promise.all(examples.map(function(example) {
-        return instance.unpackPrice.call(example[0]);
-      }));
-    }).then(function(results) {
-      examples.forEach(function (example, index) {
-        var result = results[index];
-        assert.equal(result[0].valueOf(), UbiTokTypes.encodeDirection('Invalid'), example[1]);
-      });
-    });
-  });
-
-  it("should pack and unpack valid prices", function() {
-    var examples = [
-      [UbiTokTypes.encodeDirection('Buy'),      999,   6,     1, "buy price max"],
-      [UbiTokTypes.encodeDirection('Buy'),      100,  -5, 10800, "buy price min"],
-      [UbiTokTypes.encodeDirection('Buy'),      500,   2,  4100, "buy price 50.0"],
-      [UbiTokTypes.encodeDirection('Buy'),      100,   1,  5400, "buy price 1.0"],
-      [UbiTokTypes.encodeDirection('Buy'),      123,  -1,  7177, "buy price 0.0123"],
-      [UbiTokTypes.encodeDirection('Sell'),     100,  -5, 10801, "sell price min"],
-      [UbiTokTypes.encodeDirection('Sell'),     999,   6, 21600, "sell price max"],
-      [UbiTokTypes.encodeDirection('Sell'),     500,   2, 17501, "sell price 50.0"],
-      [UbiTokTypes.encodeDirection('Sell'),     123,  -1, 14424, "sell price 0.0123"],
-      [UbiTokTypes.encodeDirection('Sell'),     100,  -2, 13501, "sell price 0.001"],
-      [UbiTokTypes.encodeDirection('Sell'),     999,  -3, 13500, "sell price 0.000999"]
-    ];
-    var uut;
-    return UbiTokExchange.deployed().then(function(instance) {
-      uut = instance;
-      return Promise.all(examples.map(function(example) {
-        return uut.packPrice.call(example[0],example[1],example[2]);
-      }));
-    }).then(function(results) {
-      examples.forEach(function (example, index) {
-        var result = results[index];
-        assert.equal(result.valueOf(), example[3], 'pack ' + example[4]);
-      });
-      return Promise.all(examples.map(function(example) {
-        return uut.unpackPrice.call(example[3]);
-      }));
-    }).then(function(results) {
-      examples.forEach(function (example, index) {
-        var result = results[index];
-        assert.equal(result[0].valueOf(), example[0], 'unpack ' + example[4]);
-        assert.equal(result[1].valueOf(), example[1], 'unpack ' + example[4]);
-        assert.equal(result[2].valueOf(), example[2], 'unpack ' + example[4]);
-      });
-    });
-  });
-
-  it("should compute quoted prices", function() {
-    var examples = [
-      [1000, 123, 1, 1230, "1000 x 0.123 x 10**1 = 1000 * 1.23 = 1230"],
-    ];
-    return UbiTokExchange.deployed().then(function(instance) {
-      return Promise.all(examples.map(function(example) {
-        return instance.computeQuotedAmount.call(example[0],example[1],example[2]);
-      }));
-    }).then(function(results) {
-      examples.forEach(function (example, index) {
-        var result = results[index];
-        assert.equal(result.valueOf(), example[3], example[4]);
-      });
-    });
-  });
-
-  it("should calculate opposite packed price", function() {
-    var examples = [
-      [UbiTokTypes.encodeDirection('Buy'),      999,   6,     1, "buy price max"],
-      [UbiTokTypes.encodeDirection('Buy'),      100,  -5, 10800, "buy price min"],
-      [UbiTokTypes.encodeDirection('Buy'),      500,   2,  4100, "buy price 50.0"],
-      [UbiTokTypes.encodeDirection('Buy'),      100,   1,  5400, "buy price 1.0"],
-      [UbiTokTypes.encodeDirection('Buy'),      123,  -1,  7177, "buy price 0.0123"],
-      [UbiTokTypes.encodeDirection('Sell'),     100,  -5, 10801, "sell price min"],
-      [UbiTokTypes.encodeDirection('Sell'),     999,   6, 21600, "sell price max"],
-      [UbiTokTypes.encodeDirection('Sell'),     500,   2, 17501, "sell price 50.0"],
-      [UbiTokTypes.encodeDirection('Sell'),     123,  -1, 14424, "sell price 0.0123"],
-      [UbiTokTypes.encodeDirection('Sell'),     100,  -2, 13501, "sell price 0.001"],
-      [UbiTokTypes.encodeDirection('Sell'),     999,  -3, 13500, "sell price 0.000999"]
-    ];
-    var uut;
-    return UbiTokExchange.deployed().then(function(instance) {
-      uut = instance;
-      return Promise.all(examples.map(function(example) {
-        return uut.oppositePackedPrice.call(example[3]);
-      }));
-    }).then(function(results) {
-      return Promise.all(results.map(function(result) {
-        return uut.unpackPrice.call(result);
-      }));
-    }).then(function(results) {
-      examples.forEach(function (example, index) {
-        var result = results[index];
-        assert.equal(result[0].valueOf(), UbiTokTypes.oppositeEncodedDirection(example[0]), 'opposite+unpack ' + example[4]);
-        assert.equal(result[1].valueOf(), example[1], 'opposite+unpack ' + example[4]);
-        assert.equal(result[2].valueOf(), example[2], 'opposite+unpack ' + example[4]);
-      });
-    });
-  });
-  
-});
-
-contract('UbiTokExchange', function(accounts) {
-  var packedBuyOnePointZero = 4500;
+contract('BookERC20EthV1 - create order errors', function(accounts) {
+  var packedBuyOnePointZero = UbiTokTypes.encodePrice('Buy @ 1.00');
   it("instantly throws on invalid order id", function() {
     var uut;
-    return UbiTokExchange.deployed().then(function(instance) {
+    return BookERC20EthV1.deployed().then(function(instance) {
       uut = instance;
-      return uut.createOrder(0, packedBuyOnePointZero, web3.toWei(1, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), {from: accounts[0]});
+      return uut.createOrder(0, packedBuyOnePointZero, web3.toWei(1, 'finney'), UbiTokTypes.encodeTerms('GTCNoGasTopup'), 3, {from: accounts[0]});
     }).then(assert.fail).catch(function(error) {
-      assert(error.message.indexOf('invalid opcode') >= 0, 'error should be a solidity throw');
+      assert(error.message.indexOf('invalid opcode') >= 0, 'error should be a solidity throw, not ' + error);
     });
   });
   it("instantly throws on duplicate order id", function() {
     var uut;
-    return UbiTokExchange.deployed().then(function(instance) {
+    return BookERC20EthV1.deployed().then(function(instance) {
       uut = instance;
-      return uut.depositQuotedForTesting(accounts[0], web3.toWei(2, 'finney'), {from: accounts[0]});
+      return uut.depositCntr({from: accounts[0], value: web3.toWei(10, 'finney')});
     }).then(function(result) {
-      return uut.createOrder(1001, packedBuyOnePointZero, web3.toWei(1, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), {from: accounts[0]});
+      return uut.createOrder(1001, packedBuyOnePointZero, web3.toWei(1, 'finney'), UbiTokTypes.encodeTerms('GTCNoGasTopup'), 3, {from: accounts[0]});
     }).then(function(result) {
-      return uut.createOrder(1001, packedBuyOnePointZero, web3.toWei(1, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), {from: accounts[0]});
+      return uut.createOrder(1001, packedBuyOnePointZero, web3.toWei(1, 'finney'), UbiTokTypes.encodeTerms('GTCNoGasTopup'), 3, {from: accounts[0]});
     }).then(assert.fail).catch(function(error) {
-      assert(error.message.indexOf('invalid opcode') >= 0, 'error should be a solidity throw');
+      assert(error.message.indexOf('invalid opcode') >= 0, 'error should be a solidity throw, not ' + error);
     });
   });
 });
 
-contract('UbiTokExchange', function(accounts) {
-  var packedBuyOnePointZero = 4500;
+contract('BookERC20EthV1 - create order rejects', function(accounts) {
+  var packedBuyOnePointZero = UbiTokTypes.encodePrice('Buy @ 1.00');
   var packedMaxBuyPrice = 1;
   var badOrders = [
-    [ 1001, 0, web3.toWei(1, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), "obviously invalid price", "InvalidPrice" ],
-    [ 1002, packedBuyOnePointZero, web3.toWei(100, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), "not enough funds", "InsufficientFunds" ],
-    [ 1003, packedBuyOnePointZero, new web3.BigNumber("1e39"), UbiTokTypes.encodeTerms('GoodTillCancel'), "preposterously large base size", "InvalidSize" ],
-    [ 1004, packedMaxBuyPrice, new web3.BigNumber("1e36"), UbiTokTypes.encodeTerms('GoodTillCancel'), "preposterously large quoted size (but base just ok)", "InvalidSize" ],
-    [ 1005, packedBuyOnePointZero, 90, UbiTokTypes.encodeTerms('GoodTillCancel'), "small base size", "InvalidSize" ],
-    [ 1006, packedBuyOnePointZero, 900, UbiTokTypes.encodeTerms('GoodTillCancel'), "small quoted size (but base ok)", "InvalidSize" ],
+    [ 1001, 0, web3.toWei(1, 'finney'), UbiTokTypes.encodeTerms('GTCNoGasTopup'), 3, "obviously invalid price", "InvalidPrice" ],
+    [ 1002, packedBuyOnePointZero, web3.toWei(100, 'finney'), UbiTokTypes.encodeTerms('GTCNoGasTopup'), 3, "not enough funds", "InsufficientFunds" ],
+    [ 1003, packedBuyOnePointZero, new web3.BigNumber("1e39"), UbiTokTypes.encodeTerms('GTCNoGasTopup'), 3, "preposterously large base size", "InvalidSize" ],
+    [ 1004, packedMaxBuyPrice, new web3.BigNumber("1e36"), UbiTokTypes.encodeTerms('GTCNoGasTopup'), 3, "preposterously large quoted size (but base just ok)", "InvalidSize" ],
+    [ 1005, packedBuyOnePointZero, 90, UbiTokTypes.encodeTerms('GTCNoGasTopup'), 3, "small base size", "InvalidSize" ],
+    [ 1006, packedBuyOnePointZero, 900, UbiTokTypes.encodeTerms('GTCNoGasTopup'), 3, "small quoted size (but base ok)", "InvalidSize" ],
+    // TODO - invalid terms (e.g. maxMatches > 0 with MakerOnly)
   ];
   var balanceQuotedAfterDeposit;
   it("first accepts a deposit to be used to place bad orders", function() {
     var uut;
-    return UbiTokExchange.deployed().then(function(instance) {
+    return BookERC20EthV1.deployed().then(function(instance) {
       uut = instance;
-      return uut.depositQuotedForTesting(accounts[0], web3.toWei(2, 'finney'), {from: accounts[0]});
+      return uut.depositCntr({from: accounts[0], value: web3.toWei(2, 'finney')});
     }).then(function(result) {
       return uut.getClientBalances.call(accounts[0]);
     }).then(function(balances) {
@@ -188,17 +55,17 @@ contract('UbiTokExchange', function(accounts) {
     });
   });
   badOrders.forEach(function(badOrder) {
-    it("gracefully reject create order with " + badOrder[4] + " (at no cost)", function() {
+    it("gracefully reject create order with " + badOrder[5] + " (at no cost)", function() {
       var uut;
-      return UbiTokExchange.deployed().then(function(instance) {
+      return BookERC20EthV1.deployed().then(function(instance) {
         uut = instance;
-        return uut.createOrder(badOrder[0], badOrder[1], badOrder[2], badOrder[3], {from: accounts[0]});
+        return uut.createOrder(badOrder[0], badOrder[1], badOrder[2], badOrder[3], badOrder[4], {from: accounts[0]});
       }).then(function(result) {
         return uut.getOrderState.call(badOrder[0]);
       }).then(function(result) {
-        var state = UbiTokTypes.decodeState(result);
+        var state = UbiTokTypes.decodeOrderState(badOrder[0], result);
         assert.equal(state.status, 'Rejected');
-        assert.equal(state.rejectReason, badOrder[5]);
+        assert.equal(state.reasonCode, badOrder[6]);
         return uut.getClientBalances.call(accounts[0]);
       }).then(function(balancesAfterOrderRejected) {
         assert.equal(balancesAfterOrderRejected[1].toString(), balanceQuotedAfterDeposit.toString());
@@ -207,8 +74,68 @@ contract('UbiTokExchange', function(accounts) {
   });
 });
 
+contract('TestToken - basics', function(accounts) {
+  it("transfer gives funds", function() {
+    var testToken;
+    var transferAmount = new BigNumber("1000000");
+    return TestToken.deployed().then(function(instance) {
+      testToken = instance;
+    }).then(function(junk) {
+      return testToken.transfer(accounts[1], transferAmount);
+    }).then(function(junk) {
+      return testToken.balanceOf.call(accounts[1]);
+    }).then(function(balance) {
+      assert.equal(transferAmount.toString(), balance.toString());
+    });
+  });
+});
 
-function buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges) {
+contract('BookERC20EthV1 - ERC20 payments', function(accounts) {
+  it("deposit with approve + transferFrom", function() {
+    var uut;
+    var testToken;
+    var depositAmount = new BigNumber("1000000");
+    return TestToken.deployed().then(function(instance) {
+      testToken = instance;
+      return BookERC20EthV1.deployed();
+    }).then(function(instance) {
+      uut = instance;
+      return uut.init(testToken.address);
+    }).then(function(junk) {
+      return testToken.transfer(accounts[1], depositAmount, {from: accounts[0]});
+    }).then(function(junk) {
+      return testToken.balanceOf.call(accounts[1]);
+    }).then(function(balance) {
+      assert.equal(depositAmount.toString(), balance.toString());
+      return testToken.approve(uut.address, depositAmount, {from: accounts[1]});
+    }).then(function(junk) {
+      // TODO assert something
+      return uut.transferFromBase({from: accounts[1]});
+    }).then(function(junk) {
+      return uut.getClientBalances.call(accounts[1]);
+    }).then(function(balances) {
+      assert.equal(balances[0].toString(), depositAmount.toString());
+    });
+  });
+});
+
+var standardInitialBalanceBase = 1000000000;
+var standardInitialBalanceCntr =  100000000;
+
+// Yeah, this is pretty gnarly - but at least the scenarios themsleves are
+// easy to read since all the ugliness is hidden here.
+// We build a promise chain that sets up initial balances, runs through the commands,
+// then checks the orders, book and balances are as expected at the end.
+function buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges) {
+  var context = {};
+  context.accounts = accounts;
+  var chain = BookERC20EthV1.deployed().then(function(instance) {
+    context.uut = instance;
+    return TestToken.deployed();
+  }).then(function(instance) {
+    context.testToken = instance;
+    return context.uut.init(context.testToken.address);
+  });
   var clients = new Set();
   for (var cmd of commands) {
     clients.add(cmd[2]);
@@ -216,25 +143,31 @@ function buildScenario(chain, context, commands, expectedOrders, expectedBalance
   for (var expectedBalanceChange of expectedBalanceChanges) {
     clients.add(expectedBalanceChange[0]);
   }
-  var standardInitialBalanceBase   = 1000000000;
-  var standardInitialBalanceQuoted =  100000000;
   var accountIdForClient = {};
-  var nextAccountId = 0;
+  var nextAccountId = 1;
   for (var client of clients) {
     accountIdForClient[client] = nextAccountId;
     nextAccountId++;
-    console.log("client " + client + " has account #" + accountIdForClient[client]);
     chain = chain.then((function (ctx, a, ab) {
       return function (lastResult) {
-        console.log("depositing into " + ctx.accounts[a]);
-        return ctx.uut.depositBaseForTesting(ctx.accounts[a], ab, {from: ctx.accounts[a]});
+        return ctx.testToken.transfer(ctx.accounts[a], ab, {from: ctx.accounts[0]});
       };
     }(context, accountIdForClient[client], standardInitialBalanceBase)));
-    chain = chain.then((function (ctx, a, aq) {
+    chain = chain.then((function (ctx, a, ab) {
       return function (lastResult) {
-        return ctx.uut.depositQuotedForTesting(ctx.accounts[a], aq, {from: ctx.accounts[a]});
+        return ctx.testToken.approve(ctx.uut.address, ab, {from: ctx.accounts[a]});
       };
-    }(context, accountIdForClient[client], standardInitialBalanceQuoted)));
+    }(context, accountIdForClient[client], standardInitialBalanceBase)));
+    chain = chain.then((function (ctx, a, ab) {
+      return function (lastResult) {
+        return ctx.uut.transferFromBase({from: ctx.accounts[a]});
+      };
+    }(context, accountIdForClient[client], standardInitialBalanceBase)));
+    chain = chain.then((function (ctx, a, ac) {
+      return function (lastResult) {
+        return ctx.uut.depositCntr({from: ctx.accounts[a], value: ac});
+      };
+    }(context, accountIdForClient[client], standardInitialBalanceCntr)));
   }
   for (var cmd of commands) {
     chain = chain.then((function (ctx, a, c) {
@@ -244,6 +177,7 @@ function buildScenario(chain, context, commands, expectedOrders, expectedBalance
           UbiTokTypes.encodePrice(c[4]),
           c[5],
           UbiTokTypes.encodeTerms(c[6]),
+          c[7],
           {from: ctx.accounts[a]}
         );
       };
@@ -257,11 +191,11 @@ function buildScenario(chain, context, commands, expectedOrders, expectedBalance
     }(context, expectedOrder)));
     chain = chain.then((function (ctx, eo) {
       return function (lastResult) {
-        var state = UbiTokTypes.decodeState(lastResult);
-        assert.equal(state.status, eo[1], "order " + eo[0]);
-        assert.equal(state.rejectReason, eo[2], "order " + eo[0]);
-        assert.equal(state.executedBase, eo[3], "order " + eo[0]);
-        assert.equal(state.executedQuoted, eo[4], "order " + eo[0]);
+        var state = UbiTokTypes.decodeOrderState(eo[0], lastResult);
+        assert.equal(state.status, eo[1], "status of order " + eo[0]);
+        assert.equal(state.reasonCode, eo[2], "reasonCode of order " + eo[0]);
+        assert.equal(state.rawExecutedBase, eo[3], "rawExecutedBase of order " + eo[0]);
+        assert.equal(state.rawExecutedCntr, eo[4], "rawExecutedCntr of order " + eo[0]);
       };
     }(context, expectedOrder)));
   }
@@ -269,25 +203,24 @@ function buildScenario(chain, context, commands, expectedOrders, expectedBalance
     var client = expectedBalanceChange[0];
     chain = chain.then((function (ctx, a, ebc) {
       return function (lastResult) {
-        console.log("getting balance of " + ctx.accounts[a]);
         return ctx.uut.getClientBalances.call(ctx.accounts[a]);
       };
     }(context, accountIdForClient[client], expectedBalanceChange)));
     chain = chain.then((function (ctx, a, ebc) {
       return function (lastResult) {
         assert.equal(lastResult[0].toNumber() - standardInitialBalanceBase, ebc[1], "base balance change for " + ebc[0]);
-        assert.equal(lastResult[1].toNumber() - standardInitialBalanceQuoted, ebc[2], "quoted balance change for " + ebc[0]);
+        assert.equal(lastResult[1].toNumber() - standardInitialBalanceCntr, ebc[2], "counter balance change for " + ebc[0]);
       };
     }(context, accountIdForClient[client], expectedBalanceChange)));
   }
   return chain;
 }
 
-contract('UbiTokExchange', function(accounts) {
+contract('BookERC20EthV1 - scenarios', function(accounts) {
   it("two orders that don't match", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell @ 0.600", 100000, 'GoodTillCancel']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.600", 100000, 'GTCNoGasTopup', 3]
     ];
     var expectedOrders = [
       ["101", 'Open', 'None', 0,  0],
@@ -297,21 +230,15 @@ contract('UbiTokExchange', function(accounts) {
       ["client1",      +0, -50000],
       ["client2", -100000,      0]
     ];
-    var context = {
-      accounts: accounts
-    };
-    var chain = UbiTokExchange.deployed().then(function(instance) {
-      context.uut = instance;
-    });
-    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+    return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
   });
 });
 
-contract('UbiTokExchange', function(accounts) {
+contract('BookERC20EthV1', function(accounts) {
   it("two orders exactly match", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell @ 0.500", 100000, 'GoodTillCancel']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.500", 100000, 'GTCNoGasTopup', 3]
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000,  50000],
@@ -319,23 +246,17 @@ contract('UbiTokExchange', function(accounts) {
     ];
     var expectedBalanceChanges = [
       ["client1", +100000, -50000],
-      ["client2", -100000, +50000]
+      ["client2", -100000, +50000 * 0.9995]  // taker pays fee
     ];
-    var context = {
-      accounts: accounts
-    };
-    var chain = UbiTokExchange.deployed().then(function(instance) {
-      context.uut = instance;
-    });
-    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+    return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
   });
 });
 
-contract('UbiTokExchange', function(accounts) {
+contract('BookERC20EthV1', function(accounts) {
   it("two orders partial match of 2nd", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell @ 0.500", 300000, 'GoodTillCancel']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.500", 300000, 'GTCNoGasTopup', 3]
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000,  50000],
@@ -343,24 +264,17 @@ contract('UbiTokExchange', function(accounts) {
     ];
     var expectedBalanceChanges = [
       ["client1", +100000,  -50000],
-      ["client2", -300000,  +50000]
+      ["client2", -300000,  +50000 * 0.9995]
     ];
-
-    var context = {
-      accounts: accounts
-    };
-    var chain = UbiTokExchange.deployed().then(function(instance) {
-      context.uut = instance;
-    });
-    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+    return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
   });
 });
 
-contract('UbiTokExchange', function(accounts) {
+contract('BookERC20EthV1', function(accounts) {
   it("two orders best execution", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell @ 0.400", 100000, 'GoodTillCancel']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.400", 100000, 'GTCNoGasTopup', 3]
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000,  50000],
@@ -368,25 +282,20 @@ contract('UbiTokExchange', function(accounts) {
     ];
     var expectedBalanceChanges = [
       ["client1", +100000,  -50000],
-      ["client2", -100000,  +50000]
+      ["client2", -100000,  +50000 * 0.9995]
     ];
-
-    var context = {
-      accounts: accounts
-    };
-    var chain = UbiTokExchange.deployed().then(function(instance) {
-      context.uut = instance;
-    });
-    return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
+    return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
   });
 });
 
-contract('UbiTokExchange', function(accounts) {
+/*
+
+contract('BookERC20EthV1', function(accounts) {
   it("three orders mixed prices", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client1", "102",  "Buy @ 0.600", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell @ 0.400", 200000, 'GoodTillCancel']
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup'],
+      ['Create', 'OK', "client1", "102",  "Buy @ 0.600", 100000, 'GTCNoGasTopup'],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.400", 200000, 'GTCNoGasTopup']
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000,  50000],
@@ -400,19 +309,19 @@ contract('UbiTokExchange', function(accounts) {
     var context = {
       accounts: accounts
     };
-    var chain = UbiTokExchange.deployed().then(function(instance) {
+    var chain = BookERC20EthV1.deployed().then(function(instance) {
       context.uut = instance;
     });
     return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
   });
 });
 
-contract('UbiTokExchange', function(accounts) {
+contract('BookERC20EthV1', function(accounts) {
   it("order takes and makes", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
-      ['Create', 'OK', "client2", "201", "Sell @ 0.400", 200000, 'GoodTillCancel'],
-      ['Create', 'OK', "client3", "301",  "Buy @ 0.500",  50000, 'GoodTillCancel'],
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup'],
+      ['Create', 'OK', "client2", "201", "Sell @ 0.400", 200000, 'GTCNoGasTopup'],
+      ['Create', 'OK', "client3", "301",  "Buy @ 0.500",  50000, 'GTCNoGasTopup'],
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000,  50000],
@@ -427,17 +336,17 @@ contract('UbiTokExchange', function(accounts) {
     var context = {
       accounts: accounts
     };
-    var chain = UbiTokExchange.deployed().then(function(instance) {
+    var chain = BookERC20EthV1.deployed().then(function(instance) {
       context.uut = instance;
     });
     return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
   });
 });
 
-contract('UbiTokExchange', function(accounts) {
+contract('BookERC20EthV1', function(accounts) {
   it("maker-only rejected if any would take", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup'],
       ['Create', 'OK', "client2", "201", "Sell @ 0.400", 200000, 'MakerOnly']
     ];
     var expectedOrders = [
@@ -451,7 +360,7 @@ contract('UbiTokExchange', function(accounts) {
     var context = {
       accounts: accounts
     };
-    var chain = UbiTokExchange.deployed().then(function(instance) {
+    var chain = BookERC20EthV1.deployed().then(function(instance) {
       context.uut = instance;
     });
     return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
@@ -461,7 +370,7 @@ contract('UbiTokExchange', function(accounts) {
 contract('UbiTokExchange', function(accounts) {
   it("maker-only accepted if none would take", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup'],
       ['Create', 'OK', "client2", "201", "Sell @ 0.600", 200000, 'MakerOnly']
     ];
     var expectedOrders = [
@@ -475,17 +384,17 @@ contract('UbiTokExchange', function(accounts) {
     var context = {
       accounts: accounts
     };
-    var chain = UbiTokExchange.deployed().then(function(instance) {
+    var chain = BookERC20EthV1.deployed().then(function(instance) {
       context.uut = instance;
     });
     return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
   });
 });
 
-contract('UbiTokExchange', function(accounts) {
+contract('BookERC20EthV1', function(accounts) {
   it("IoC cancelled if none would match", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup'],
       ['Create', 'OK', "client2", "201", "Sell @ 0.600", 200000, 'ImmediateOrCancel']
     ];
     var expectedOrders = [
@@ -499,17 +408,17 @@ contract('UbiTokExchange', function(accounts) {
     var context = {
       accounts: accounts
     };
-    var chain = UbiTokExchange.deployed().then(function(instance) {
+    var chain = BookERC20EthV1.deployed().then(function(instance) {
       context.uut = instance;
     });
     return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
   });
 });
 
-contract('UbiTokExchange', function(accounts) {
+contract('BookERC20EthV1', function(accounts) {
   it("IoC completed if all matches", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup'],
       ['Create', 'OK', "client2", "201", "Sell @ 0.400",  50000, 'ImmediateOrCancel']
     ];
     var expectedOrders = [
@@ -523,17 +432,17 @@ contract('UbiTokExchange', function(accounts) {
     var context = {
       accounts: accounts
     };
-    var chain = UbiTokExchange.deployed().then(function(instance) {
+    var chain = BookERC20EthV1.deployed().then(function(instance) {
       context.uut = instance;
     });
     return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
   });
 });
 
-contract('UbiTokExchange', function(accounts) {
+contract('BookERC20EthV1', function(accounts) {
   it("IoC remaining cancelled if some matches", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GoodTillCancel'],
+      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup'],
       ['Create', 'OK', "client2", "201", "Sell @ 0.400", 200000, 'ImmediateOrCancel']
     ];
     var expectedOrders = [
@@ -547,86 +456,11 @@ contract('UbiTokExchange', function(accounts) {
     var context = {
       accounts: accounts
     };
-    var chain = UbiTokExchange.deployed().then(function(instance) {
+    var chain = BookERC20EthV1.deployed().then(function(instance) {
       context.uut = instance;
     });
     return buildScenario(chain, context, commands, expectedOrders, expectedBalanceChanges);
   });
 });
 
-contract('UbiTokExchange', function(accounts) {
-  var packedBuyOnePointZero = UbiTokTypes.encodePrice('Buy @ 1.00');
-  var packedMaxBuyPrice = 1;
-  var minSellPricePacked = 10801;
-  var buyFiftyPricePacked = UbiTokTypes.encodePrice('Buy @ 50.0');
-  var buyPoint0123PricePacked = UbiTokTypes.encodePrice('Buy @ 0.123');
-  var sellFiftyPricePacked = UbiTokTypes.encodePrice('Sell @ 50.0');
-  it("allows finding first open order from a price", function() {
-    var uut;
-    return UbiTokExchange.deployed().then(function(instance) {
-      uut = instance;
-      console.log('0');
-      return uut.depositQuotedForTesting(accounts[0], web3.toWei(200, 'finney'), {from: accounts[0]});
-    }).then(function(result) {
-      console.log('1');
-      return uut.depositBaseForTesting(accounts[0], web3.toWei(100, 'finney'), {from: accounts[0]});
-    }).then(function(result) {
-      console.log('2');
-      return uut.walkBook.call(packedMaxBuyPrice);
-    }).then(function(result) {
-      console.log('3');
-      assert.equal(result[1].valueOf(), 0, "no orders in book");
-    }).then(function(result) {
-      console.log('4');
-      return uut.walkBook.call(minSellPricePacked);
-    }).then(function(result) {
-      console.log('5');
-      assert.equal(result[1].valueOf(), 0, "no orders in book");
-      return uut.createOrder(1001, buyFiftyPricePacked, web3.toWei(1, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), {from: accounts[0]});
-    }).then(function(result) {
-      console.log('6');
-      return uut.getOrderState.call(1001);
-    }).then(function(result) {
-      console.log('7');
-      var state = UbiTokTypes.decodeState(result);
-      assert.equal(state.status, "Open", "expected order 1001 to be open");
-      return uut.walkBook.call(packedMaxBuyPrice);
-    }).then(function(result) {
-      console.log('8');
-      assert.equal(result[1].valueOf(), web3.toWei(1, 'finney').valueOf(), "our one buy order should be found since less aggressive than max price");
-      return uut.walkBook.call(minSellPricePacked);
-    }).then(function(result) {
-      console.log('9');
-      assert.equal(result[1].valueOf(), 0, "still no sell orders in book");
-      return uut.walkBook.call(buyPoint0123PricePacked);
-    }).then(function(result) {
-      console.log('10');
-      assert.equal(result[1].valueOf(), 0, "our one buy order should not be found since more aggressive than given from price");
-      return uut.createOrder(1002, buyPoint0123PricePacked, web3.toWei(1000, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), {from: accounts[0]});
-    }).then(function(result) {
-      console.log('11');
-      return uut.getOrderState.call(1002);
-    }).then(function(result) {
-      console.log('12');
-      var state = UbiTokTypes.decodeState(result);
-      assert.equal(state.status, "Open", "expected order 1002 to be open");
-      return uut.walkBook.call(buyPoint0123PricePacked);
-    }).then(function(result) {
-      console.log('13');
-      assert.equal(result[1].valueOf(), web3.toWei(1000, 'finney'), "our 2nd buy order should now be found since equal to given from price");
-      return uut.createOrder(1003, sellFiftyPricePacked, web3.toWei(3, 'finney'), UbiTokTypes.encodeTerms('GoodTillCancel'), {from: accounts[0]});
-    }).then(function(result) {
-      console.log('14');
-      return uut.getOrderState.call(1003);
-    }).then(function(result) {
-      console.log('15');
-      var state = UbiTokTypes.decodeState(result);
-      assert.equal(state.status, "Open", "expected order 1003 to be open");
-      assert.equal(state.executedBase.toString(), web3.toWei(1, 'finney'), "expected order 1003 to have executed against order 1001");
-      return uut.walkBook.call(packedMaxBuyPrice);
-    }).then(function(result) {
-      console.log('16');
-      assert.equal(result[1].valueOf(), web3.toWei(1000, 'finney').valueOf(), "order 1002 is now the top buy in the book");
-    });
-  });
-});
+*/

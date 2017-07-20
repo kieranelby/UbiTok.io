@@ -68,6 +68,8 @@ function decodeEnum(enumNamedValues, encodedValue) {
   return enumNamedValues[encodedValue];
 };
 
+exports.BigNumber = BigNumber;
+
 exports.encodeDirection = function (directionName) {
   return encodeEnum(enumDirection, directionName);
 };
@@ -116,7 +118,6 @@ exports.encodePrice = function (friendlyPrice) {
   var direction = splitPrice[0];
   var mantissa = splitPrice[1];
   var exponent = splitPrice[2];
-  console.log(friendlyPrice, "=>", direction, mantissa, exponent);
   if (direction === 'Invalid') {
      return 0;
   }
@@ -130,7 +131,6 @@ exports.encodePrice = function (friendlyPrice) {
   var zeroBasedMantissa = mantissa - 100;
   var priceIndex = zeroBasedExponent * 900 + zeroBasedMantissa;
   var sidedPriceIndex = (direction === 'Buy') ? exports.minBuyPricePacked - priceIndex : exports.minSellPricePacked + priceIndex;
-  console.log(friendlyPrice, "=>", direction, mantissa, exponent, "=>", sidedPriceIndex);
   return sidedPriceIndex;
 };
 
@@ -326,7 +326,7 @@ exports.decodeWalkClientOrder = function (order) {
     status: exports.decodeStatus(order[4]),
     reasonCode: exports.decodeReasonCode(order[5]),
     rawExecutedBase: order[6],
-    rawExecutedQuoted: order[7],
+    rawExecutedCntr: order[7],
     rawFees: order[8]
   };
 };
@@ -338,7 +338,7 @@ exports.decodeOrderState = function (orderId, state) {
     status: exports.decodeStatus(state[0]),
     reasonCode: exports.decodeReasonCode(state[1]),
     rawExecutedBase: state[2],
-    rawExecutedQuoted: state[3],
+    rawExecutedCntr: state[3],
     rawFees: state[4]
   };
 };

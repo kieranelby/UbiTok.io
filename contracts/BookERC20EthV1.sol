@@ -299,6 +299,7 @@ contract BookERC20EthV1 {
   // Public Funds Manipulation - withdraw base tokens (as a transfer).
   //
   function transferBase(uint amountBase) public {
+    // TODO - check not outrageously large (overflow bugs)
     address client = msg.sender;
     require(amountBase > 0);
     require(amountBase <= balanceBaseForClient[client]);
@@ -313,6 +314,7 @@ contract BookERC20EthV1 {
   // This probably only makes sense when the client is a smart-contract.
   //
   function approveBase(uint newAllowanceBase) public {
+    // TODO - check not outrageously large (overflow bugs)
     address client = msg.sender;
     address book = address(this);
     uint oldAllowanceBase = baseToken.allowance(book, client);
@@ -353,6 +355,7 @@ contract BookERC20EthV1 {
   // Public Funds Manipulation - withdraw counter currency (ETH).
   //
   function withdrawCntr(uint amountCntr) public {
+    // TODO - check not outrageously large (overflow bugs)
     address client = msg.sender;
     require(amountCntr > 0);
     require(amountCntr <= balanceCntrForClient[client]);
@@ -515,7 +518,7 @@ contract BookERC20EthV1 {
       uint128 orderId, uint16 price, uint sizeBase, Terms terms, uint maxMatches
     ) public {
     address client = msg.sender;
-    require(client != 0 && orderId != 0 || orderForOrderId[orderId].client == 0);
+    require(client != 0 && orderId != 0 && orderForOrderId[orderId].client == 0);
     ClientOrderEvent(client, ClientOrderEventType.Create, orderId);
     orderForOrderId[orderId] =
       Order(client, price, sizeBase, terms, Status.Unknown, ReasonCode.None, 0, 0, 0);

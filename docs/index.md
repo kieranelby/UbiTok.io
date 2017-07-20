@@ -75,7 +75,6 @@ In order to avoid relying on trading fees, we hope to offer value-added products
 Perhaps you have some ideas for smart tokens that can be traded on our exchange, or for autonomous smart contracts that place orders into the exchange - we look forward to seeing what can be done with a fully on-chain trading venue.
 
 ## Are you planning a crowd-sale?
-
 We are considering a crowd-sale to allow us to invest in marketing, better UI design, client support - and most importantly to accelerate our product development.
 
 We want to make sure we have a working product and a solid business model first though.
