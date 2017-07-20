@@ -550,7 +550,7 @@ class App extends Component {
       status: "Sending",
       reasonCode: "None",
       rawExecutedBase: new BigNumber(0),
-      rawExecutedQuoted: new BigNumber(0),
+      rawExecutedCntr: new BigNumber(0),
       rawFees: new BigNumber(0)
     };
   }
