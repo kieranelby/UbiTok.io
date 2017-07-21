@@ -30,3 +30,11 @@
 .sell {
   color: #900020;
 }
+
+#funds-table {
+  margin-bottom: 0;
+}
+
+#payment-tabs {
+  border-bottom: 1px solid #ddd;
+}

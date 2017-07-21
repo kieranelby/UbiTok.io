@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { Navbar, Nav, NavItem, Tab, Tabs, Well, Panel,
          Grid, Row, Col, Table,
          ButtonToolbar, Button, Glyphicon, 
-         FormGroup, FormControl, ControlLabel, HelpBlock } from 'react-bootstrap';
+         FormGroup, FormControl, ControlLabel, HelpBlock, InputGroup } from 'react-bootstrap';
 import update from 'immutability-helper';
 
 import logo from './ubitok-logo.svg';
@@ -13,7 +13,7 @@ import './App.css';
 
 import Bridge from './bridge.js'
 import UbiTokTypes from 'ubi-lib/ubi-tok-types.js';
-import BigNumber from 'bignumber.js';
+var BigNumber = UbiTokTypes.BigNumber;
 
 // Work around for:
 // a) passing Nav props into a form element
@@ -78,6 +78,10 @@ class App extends Component {
         "approvedButNotTransferred": ["", ""],
         "exchange": ["", ""]
       },
+
+      // which payment tab the user is on
+
+      "paymentTabKey": "none",
 
       // TODO - some sort of deposit/withdraw/approve form
       // payments we've made
@@ -606,8 +610,8 @@ class App extends Component {
                 <Nav>
                   <MyNavForm id="productSelectForm">
                     <FormGroup controlId="productSelect">
-                      <FormControl componentClass="select" placeholder="Choose product">
-                        <option value="UBI/ETH">Product: UBI/ETH</option>
+                      <FormControl componentClass="select" placeholder="Choose book">
+                        <option value="UBI/ETH">Book: UBI/ETH</option>
                       </FormControl>
                     </FormGroup>
                   </MyNavForm>
@@ -703,35 +707,144 @@ class App extends Component {
                       <td>{this.state.pairInfo.cntr.tradableType}</td>
                     </tr>
                     <tr>
-                      <td>Minimum Size</td>
+                      <td>Minimum Order</td>
                       <td>{this.state.pairInfo.base.minInitialSize}</td>
                       <td>{this.state.pairInfo.cntr.minInitialSize}</td>
                     </tr>
                   </tbody>
                 </Table>
-                <h3>My Balances</h3>
-                <Table striped bordered condensed hover>
-                  <thead>
-                    <tr>
-                      <th>Symbol</th>
-                      <th>Exchange Balance</th>
-                    </tr>
-                  </thead>
+                <h3>Balances and Payments</h3>
+                <Table bordered condensed id="funds-table">
                   <tbody>
                     <tr>
-                      <td>{this.state.pairInfo.base.symbol}</td>
-                      <td>{this.state.balances.exchange[0]}</td>
+                      <th colSpan="2">
+                        {this.state.pairInfo.base.symbol}
+                        <ButtonToolbar className="pull-right">
+                          <Button bsStyle="primary" bsSize="xsmall" onClick={() => this.setState({paymentTabKey: "depositBase"})}>Deposit</Button>
+                          <Button bsStyle="warning" bsSize="xsmall" onClick={() => this.setState({paymentTabKey: "withdrawBase"})}>Withdraw</Button>
+                        </ButtonToolbar>
+                      </th>
                     </tr>
                     <tr>
-                      <td>{this.state.pairInfo.cntr.symbol}</td>
-                      <td>{this.state.balances.exchange[1]}</td>
+                      <td style={{width:"50%"}}>Book Contract</td>
+                      <th>{this.state.balances.exchange[0]}</th>
+                    </tr>
+                    <tr>
+                      <td>Your Account</td>
+                      <td>{this.state.balances.wallet[0]}</td>
+                    </tr>
+                    <tr>
+                      <th colSpan="2">
+                        {this.state.pairInfo.cntr.symbol}
+                        <ButtonToolbar className="pull-right">
+                          <Button bsStyle="primary" bsSize="xsmall" onClick={() => this.setState({paymentTabKey: "depositCntr"})}>Deposit</Button>
+                          <Button bsStyle="warning" bsSize="xsmall" onClick={() => this.setState({paymentTabKey: "withdrawCntr"})}>Withdraw</Button>
+                        </ButtonToolbar>
+                      </th>
+                    </tr>
+                    <tr>
+                      <td>Book Contract</td>
+                      <th>{this.state.balances.exchange[1]}</th>
+                    </tr>
+                    <tr>
+                      <td>Your Account</td>
+                      <td>{this.state.balances.wallet[1]}</td>
                     </tr>
                   </tbody>
                 </Table>
-                <ButtonToolbar>
-                  <Button bsStyle="primary">Deposit</Button>
-                  <Button bsStyle="warning">Withdraw</Button>
-                </ButtonToolbar>
+                <Tab.Container activeKey={this.state.paymentTabKey} onSelect={()=>{}} id="payment-tabs">
+                  <Tab.Content>
+                    <Tab.Pane eventKey="none" className="emptyTabPane">
+                      <i>Open orders and approved tokens are not included.</i>
+                    </Tab.Pane>
+                    <Tab.Pane eventKey="depositBase">
+                      <p>
+                        <b>Deposit {this.state.pairInfo.base.symbol}</b>
+                        <Button bsSize="xsmall" className="pull-right" bsStyle="default" onClick={() => this.setState({paymentTabKey: "none"})}>
+                          <Glyphicon glyph="remove" title="close" />
+                        </Button>
+                      </p>
+                      <form id="depositBaseForm">
+                        <FormGroup controlId="step0">
+                          <ControlLabel>Step 0</ControlLabel>
+                          <HelpBlock>
+                          If you have {this.state.pairInfo.base.symbol} tokens in another exchange or account,
+                          you'll first need to withdraw/transfer them to your account: {this.state.bridgeStatus.chosenAccount}
+                          </HelpBlock>
+                        </FormGroup>
+                        <FormGroup controlId="approval">
+                          <ControlLabel>Step 1</ControlLabel>
+                          <HelpBlock>
+                          You need to <i>approve</i> the {this.state.pairInfo.symbol} book contract to allow it to receive your tokens.
+                          This is where you choose how much to deposit.
+                          </HelpBlock>
+                          <InputGroup>
+                            <InputGroup.Addon>Approved Amount</InputGroup.Addon>
+                            <FormControl type="text" value="0.0" onChange={()=>{}}/>
+                            <InputGroup.Addon>{this.state.pairInfo.base.symbol}</InputGroup.Addon>
+                          </InputGroup>
+                          <Button bsStyle="primary">
+                            Change Approved Amount
+                          </Button>
+                          <FormControl.Feedback />
+                        </FormGroup>
+                        <FormGroup controlId="collection">
+                          <ControlLabel>Step 2</ControlLabel>
+                          <HelpBlock>
+                          Finally, you need to tell the book contract to receive the {this.state.pairInfo.base.symbol} tokens you approved:
+                          </HelpBlock>
+                          <Button bsStyle="primary">
+                            Collect 0.0 approved {this.state.pairInfo.base.symbol}
+                          </Button>
+                        </FormGroup>
+                      </form>
+                    </Tab.Pane>
+                    <Tab.Pane eventKey="withdrawBase">
+                      <p>
+                        <b>Withdraw {this.state.pairInfo.base.symbol}</b>
+                        <Button bsSize="xsmall" className="pull-right" bsStyle="default" onClick={() => this.setState({paymentTabKey: "none"})}>
+                          <Glyphicon glyph="remove" title="close" />
+                        </Button>
+                      </p>
+                      <form id="withdrawBaseForm">
+                        <FormGroup controlId="transferAmount">
+                          <HelpBlock>
+                          This will transfer {this.state.pairInfo.base.symbol} tokens held for you
+                          by the {this.state.pairInfo.symbol} book contract to your account:
+                          {' '}{this.state.bridgeStatus.chosenAccount}
+                          </HelpBlock>
+                          <InputGroup>
+                            <InputGroup.Addon>Withdrawal Amount</InputGroup.Addon>
+                            <FormControl type="text" value="0.0" onChange={()=>{}}/>
+                            <InputGroup.Addon>{this.state.pairInfo.base.symbol}</InputGroup.Addon>
+                          </InputGroup>
+                          <Button bsStyle="primary">
+                            Withdraw {this.state.pairInfo.base.symbol}
+                          </Button>
+                          <FormControl.Feedback />
+                        </FormGroup>
+                      </form>
+                    </Tab.Pane>
+                    <Tab.Pane eventKey="depositCntr">
+                      <p>
+                        <b>Deposit {this.state.pairInfo.cntr.symbol}</b>
+                        <Button bsSize="xsmall" className="pull-right" bsStyle="default" onClick={() => this.setState({paymentTabKey: "none"})}>
+                          <Glyphicon glyph="remove" title="close" />
+                        </Button>
+                      </p>
+                      TODO - much simpler than base!
+                    </Tab.Pane>
+                    <Tab.Pane eventKey="withdrawCntr">
+                      <p>
+                        <b>Withdraw {this.state.pairInfo.cntr.symbol}</b>
+                        <Button bsSize="xsmall" className="pull-right" bsStyle="default" onClick={() => this.setState({paymentTabKey: "none"})}>
+                          <Glyphicon glyph="remove" title="close" />
+                        </Button>
+                      </p>
+                      TODO - can actually just use the same as base pretty much?
+                    </Tab.Pane>
+                  </Tab.Content>
+                </Tab.Container>
               </Col>
               <Col md={4}>
                 <h3>Order Book</h3>
@@ -887,7 +1000,7 @@ class App extends Component {
                     </FormGroup>
                     <FormGroup>
                       <ButtonToolbar>
-                        <Button bsStyle="primary" onClick={this.handlePlaceSellOrder}>
+                        <Button bsStyle="warning" onClick={this.handlePlaceSellOrder}>
                           Place Sell Order
                         </Button>
                       </ButtonToolbar>

@@ -1,9 +1,8 @@
 {
-  "name": "mock-app",
+  "name": "book-app",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "bignumber": "^1.1.0",
     "immutability-helper": "^2.2.2",
     "react": "^15.6.1",
     "react-bootstrap": "^0.31.0",

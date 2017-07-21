@@ -282,6 +282,7 @@ contract BookERC20EthV1 {
   }
 
   // Public Funds Manipulation - deposit previously-approved base tokens.
+  // TODO - should we specify amount here and check matches?
   //
   function transferFromBase() public {
     address client = msg.sender;
