@@ -107,6 +107,7 @@ exports.decodeMarketOrderEventType = function (encodedMarketOrderEventType) {
 };
 
 exports.baseDecimals = 18;
+exports.cntrDecimals = 18;
 exports.minimumPriceExponent = -5;
 exports.maxBuyPricePacked = 1;
 exports.minBuyPricePacked = 10800;
@@ -267,6 +268,14 @@ exports.decodeBaseAmount = function(amountWei) {
 
 exports.encodeBaseAmount = function(friendlyAmount, decimals) {
   return exports.encodeAmount(friendlyAmount, exports.baseDecimals);
+};
+
+exports.decodeCntrAmount = function(amountWei) {
+  return exports.decodeAmount(amountWei, exports.cntrDecimals);
+};
+
+exports.encodeCntrAmount = function(friendlyAmount, decimals) {
+  return exports.encodeAmount(friendlyAmount, exports.cntrDecimals);
 };
 
 exports.decodeOrderId = function(rawOrderId) {

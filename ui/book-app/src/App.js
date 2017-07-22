@@ -75,30 +75,32 @@ class App extends Component {
         "wallet": ["", ""],
         // e.g. if we have approved some of our ERC20 funds for the contract
         // but not told the contract to transfer them to itself yet (fiddly!)
-        "approvedButNotTransferred": ["", ""],
+        "approved": ["", ""],
         "exchange": ["", ""]
       },
 
       // which payment tab the user is on
 
       "paymentTabKey": "none",
+      
+      // payment forms
 
-      // TODO - some sort of deposit/withdraw/approve form
-      // payments we've made
-
-      "myPayments": {
-        // is this a complete record, or should we offer a 'Loading ...' indicator or
-        // a 'Show More ...' button? (TODO - how to know which - two different things?)
-        "isComplete": false,
-        // used when finding payment history with EVM events
-        "startBlock": null,
-        "payments": [
-            // TODO - varies a bit
-            // ERC20 has two steps (approve, ask contract to transferFrom)
-            // Not sure
-        ]
+      "depositBase": {
+        "newApprovedAmount": "0.0"
       },
 
+      "withdrawBase": {
+        "amount": "0.0"
+      },
+
+      "depositCntr": {
+        "amount": "0.0"
+      },
+
+      "withdrawCntr": {
+        "amount": "0.0"
+      },
+      
       // the order book
 
       "book": {
@@ -412,7 +414,7 @@ class App extends Component {
   }
 
   pollExchangeBalances = () => {
-    this.bridge.getExchangeBalances(function (error, newClientBalances) {
+    this.bridge.getBalances((error, newClientBalances) => {
       if (error) {
         console.log(error);
         return;
@@ -420,11 +422,13 @@ class App extends Component {
       this.setState((prevState, props) => {
         return {
           balances: update(prevState.balances, {
-            exchange: {$set: newClientBalances},
+            exchange: {$set: [newClientBalances[0], newClientBalances[1]]},
+            approved: {$set: [newClientBalances[2], newClientBalances[3]]},
+            wallet:   {$set: [newClientBalances[4], newClientBalances[5]]},
           })
         }
       });
-    }.bind(this));
+    });
   }
 
   handleNavSelect = (e) => {
@@ -598,6 +602,70 @@ class App extends Component {
     this.bridge.submitContinueOrder(orderId, callback);
   }
   
+  handleDepositBaseNewApprovedAmountChange = (e) => {
+    var v = e.target.value;
+    this.setState((prevState, props) => {
+      return {
+        depositBase: update(prevState.depositBase, {
+          newApprovedAmount: { $set: v }
+        })
+      };
+    });
+  }
+
+  handleDepositBaseSetApprovedAmountClick = () => {
+    this.bridge.submitDepositBaseApprove(this.state.depositBase.newApprovedAmount, (error, result) => {});
+  }
+
+  handleDepositBaseCollectClick = () => {
+    this.bridge.submitDepositBaseCollect((error, result) => {});
+  }
+
+  handleWithdrawBaseAmountChange = (e) => {
+    var v = e.target.value;
+    this.setState((prevState, props) => {
+      return {
+        withdrawBase: update(prevState.withdrawBase, {
+          amount: { $set: v }
+        })
+      };
+    });
+  }  
+  
+  handleWithdrawBaseClick = () => {
+    this.bridge.submitWithdrawBaseTransfer(this.state.withdrawBase.amount, (error, result) => {});
+  }  
+
+  handleDepositCntrAmountChange = (e) => {
+    var v = e.target.value;
+    this.setState((prevState, props) => {
+      return {
+        depositCntr: update(prevState.depositCntr, {
+          amount: { $set: v }
+        })
+      };
+    });
+  }  
+  
+  handleDepositCntrClick = () => {
+    this.bridge.submitDepositCntr(this.state.depositCntr.amount, (error, result) => {});
+  }  
+
+  handleWithdrawCntrAmountChange = (e) => {
+    var v = e.target.value;
+    this.setState((prevState, props) => {
+      return {
+        withdrawCntr: update(prevState.withdrawCntr, {
+          amount: { $set: v }
+        })
+      };
+    });
+  }  
+  
+  handleWithdrawCntrClick = () => {
+    this.bridge.submitWithdrawCntr(this.state.withdrawCntr.amount, (error, result) => {});
+  }  
+  
   render() {
     return (
       <div className="App">
@@ -755,7 +823,7 @@ class App extends Component {
                 <Tab.Container activeKey={this.state.paymentTabKey} onSelect={()=>{}} id="payment-tabs">
                   <Tab.Content>
                     <Tab.Pane eventKey="none" className="emptyTabPane">
-                      <i>Open orders and approved tokens are not included.</i>
+                      <i>Excludes book contract funds on open orders.</i>
                     </Tab.Pane>
                     <Tab.Pane eventKey="depositBase">
                       <p>
@@ -776,15 +844,22 @@ class App extends Component {
                           <ControlLabel>Step 1</ControlLabel>
                           <HelpBlock>
                           You need to <i>approve</i> the {this.state.pairInfo.symbol} book contract to allow it to receive your tokens.
+                          </HelpBlock>
+                          <InputGroup>
+                            <InputGroup.Addon>Current Approved Amount</InputGroup.Addon>
+                            <FormControl type="text" value={this.state.balances.approved[0]} readOnly onChange={()=>{}}/>
+                            <InputGroup.Addon>{this.state.pairInfo.base.symbol}</InputGroup.Addon>
+                          </InputGroup>
+                          <HelpBlock>
                           This is where you choose how much to deposit.
                           </HelpBlock>
                           <InputGroup>
-                            <InputGroup.Addon>Approved Amount</InputGroup.Addon>
-                            <FormControl type="text" value="0.0" onChange={()=>{}}/>
+                            <InputGroup.Addon>New Approved Amount</InputGroup.Addon>
+                            <FormControl type="text" value={this.state.depositBase.newApprovedAmount} onChange={this.handleDepositBaseNewApprovedAmountChange}/>
                             <InputGroup.Addon>{this.state.pairInfo.base.symbol}</InputGroup.Addon>
                           </InputGroup>
-                          <Button bsStyle="primary">
-                            Change Approved Amount
+                          <Button bsStyle="primary" onClick={this.handleDepositBaseSetApprovedAmountClick}>
+                            Set Approved Amount
                           </Button>
                           <FormControl.Feedback />
                         </FormGroup>
@@ -793,8 +868,8 @@ class App extends Component {
                           <HelpBlock>
                           Finally, you need to tell the book contract to receive the {this.state.pairInfo.base.symbol} tokens you approved:
                           </HelpBlock>
-                          <Button bsStyle="primary">
-                            Collect 0.0 approved {this.state.pairInfo.base.symbol}
+                          <Button bsStyle="primary" onClick={this.handleDepositBaseCollectClick}>
+                            Collect approved {this.state.pairInfo.base.symbol}
                           </Button>
                         </FormGroup>
                       </form>
@@ -815,10 +890,10 @@ class App extends Component {
                           </HelpBlock>
                           <InputGroup>
                             <InputGroup.Addon>Withdrawal Amount</InputGroup.Addon>
-                            <FormControl type="text" value="0.0" onChange={()=>{}}/>
+                            <FormControl type="text" value={this.state.withdrawBase.amount} onChange={this.handleWithdrawBaseAmountChange}/>
                             <InputGroup.Addon>{this.state.pairInfo.base.symbol}</InputGroup.Addon>
                           </InputGroup>
-                          <Button bsStyle="primary">
+                          <Button bsStyle="warning" onClick={this.handleWithdrawBaseClick}>
                             Withdraw {this.state.pairInfo.base.symbol}
                           </Button>
                           <FormControl.Feedback />
@@ -832,7 +907,34 @@ class App extends Component {
                           <Glyphicon glyph="remove" title="close" />
                         </Button>
                       </p>
-                      TODO - much simpler than base!
+                      <form id="depositCntrForm">
+                        <FormGroup controlId="step0">
+                          <ControlLabel>Step 0</ControlLabel>
+                          <HelpBlock>
+                          If you have {this.state.pairInfo.cntr.symbol} in another exchange or account,
+                          you'll first need to withdraw/transfer them to your account: {this.state.bridgeStatus.chosenAccount}
+                          </HelpBlock>
+                        </FormGroup>
+                        <FormGroup controlId="transferAmount">
+                          <ControlLabel>Step 1</ControlLabel>
+                          <HelpBlock>
+                          This will send {this.state.pairInfo.cntr.symbol} from your account
+                          to the {this.state.pairInfo.symbol} book contract:
+                          </HelpBlock>
+                          <InputGroup>
+                            <InputGroup.Addon>Deposit Amount</InputGroup.Addon>
+                            <FormControl type="text" value={this.state.depositCntr.amount} onChange={this.handleDepositCntrAmountChange}/>
+                            <InputGroup.Addon>{this.state.pairInfo.cntr.symbol}</InputGroup.Addon>
+                          </InputGroup>
+                          <Button bsStyle="primary" onClick={this.handleDepositCntrClick}>
+                            Deposit {this.state.pairInfo.cntr.symbol}
+                          </Button>
+                          <FormControl.Feedback />
+                          <HelpBlock>
+                          Don't forget to leave some {this.state.pairInfo.cntr.symbol} in your account to pay for gas fees.
+                          </HelpBlock>
+                        </FormGroup>
+                      </form>
                     </Tab.Pane>
                     <Tab.Pane eventKey="withdrawCntr">
                       <p>
@@ -841,7 +943,24 @@ class App extends Component {
                           <Glyphicon glyph="remove" title="close" />
                         </Button>
                       </p>
-                      TODO - can actually just use the same as base pretty much?
+                      <form id="withdrawCntrForm">
+                        <FormGroup controlId="transferAmount">
+                          <HelpBlock>
+                          This will send {this.state.pairInfo.cntr.symbol} held for you
+                          by the {this.state.pairInfo.symbol} book contract to your account:
+                          {' '}{this.state.bridgeStatus.chosenAccount}
+                          </HelpBlock>
+                          <InputGroup>
+                            <InputGroup.Addon>Withdrawal Amount</InputGroup.Addon>
+                            <FormControl type="text" value={this.state.withdrawCntr.amount} onChange={this.handleWithdrawCntrAmountChange}/>
+                            <InputGroup.Addon>{this.state.pairInfo.cntr.symbol}</InputGroup.Addon>
+                          </InputGroup>
+                          <Button bsStyle="warning" onClick={this.handleWithdrawCntrClick}>
+                            Withdraw {this.state.pairInfo.cntr.symbol}
+                          </Button>
+                          <FormControl.Feedback />
+                        </FormGroup>
+                      </form>
                     </Tab.Pane>
                   </Tab.Content>
                 </Tab.Container>
@@ -1046,6 +1165,11 @@ class App extends Component {
                             { (entry.status === 'NeedsGas') ? (
                             <Button bsSize="xsmall" bsStyle="danger" onClick={() => this.handleClickContinueOrder(entry.orderId)}>
                               <Glyphicon glyph="remove" title="cancel order" />
+                            </Button>
+                            ) : undefined }
+                            { (entry.status !== 'Open' && entry.status !== 'NeedsGas') ? (
+                            <Button bsSize="xsmall" bsStyle="" onClick={() => this.handleClickHideOrder(entry.orderId)}>
+                              <Glyphicon glyph="eye-close" title="hide order" />
                             </Button>
                             ) : undefined }
                           </ButtonToolbar>

@@ -281,8 +281,27 @@ contract BookERC20EthV1 {
     return (balanceBaseForClient[client], balanceCntrForClient[client]);
   }
 
+  // Public Funds View - get balances held by contract on behalf of the client,
+  // as well as the client's token / on-chain balances.
+  //
+  // Excludes funds in open orders.
+  //
+  // Mostly to help a web ui get a consistent snapshot of balances.
+  //
+  function getMoreClientBalances(address client) public constant returns (
+      uint bookBalanceBase, uint bookBalanceCntr,
+      uint approvedBalanceBase, uint approvedBalanceCntr,
+      uint chainBalanceBase, uint chainBalanceCntr
+    ) {
+    return (
+      balanceBaseForClient[client], balanceCntrForClient[client],
+      baseToken.allowance(client, address(this)), 0,
+      baseToken.balanceOf(client), client.balance
+    );
+  }
+
   // Public Funds Manipulation - deposit previously-approved base tokens.
-  // TODO - should we specify amount here and check matches?
+  // TODO - should caller specify amount here so we can check it matches allowance?
   //
   function transferFromBase() public {
     address client = msg.sender;
@@ -312,7 +331,8 @@ contract BookERC20EthV1 {
 
   // Public Funds Manipulation - approve client to spend their base tokens.
   //
-  // This probably only makes sense when the client is a smart-contract.
+  // This probably only makes sense when the client is a smart-contract -
+  // for deposits you want to tell the ERC20 token to approve the book ...
   //
   function approveBase(uint newAllowanceBase) public {
     // TODO - check not outrageously large (overflow bugs)
