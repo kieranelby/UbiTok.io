@@ -135,14 +135,16 @@ contract BookERC20EthV1 {
   uint constant baseMinInitialSize = 100; // yes, far too small - testing only!
   // if following partial match, the remaning gets smaller than this, remove from book and refund:
   uint constant baseMinRemainingSize = 10; // yes, far too small - testing only!
-  uint constant baseMaxSize = 2 ** 127;
+  // even multiplied by 1000000 or divided by 0.000001 this fits in 2^127:
+  uint constant baseMaxSize = 10 ** 32;
 
   // the counter currency (ETH)
 
   // no address because it is ETH
-  uint constant cntrMinInitialSize = 10000; // yes, far too small - testing only!
+  uint constant cntrMinInitialSize = 10000; // yes, far too small - testing only! (inclusive)
   // only base has min remaining size
-  uint constant cntrMaxSize = 2 ** 127;
+  // even multiplied by 1000000 or divided by 0.000001 this fits in 2^127:
+  uint constant cntrMaxSize = 10 ** 32; // exclusive
 
   // funds that belong to clients
 

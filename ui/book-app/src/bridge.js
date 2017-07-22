@@ -147,6 +147,9 @@ export default class {
   }
 
   submitDepositBaseApprove = (fmtAmount, callback) => {
+    if (!this.checkCanMakeAccountCalls(callback)) {
+      return;
+    }
     this.baseToken.approve.sendTransaction(
       this.bookContract.address,
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
@@ -159,6 +162,9 @@ export default class {
   }
 
   submitDepositBaseCollect = (callback) => {
+    if (!this.checkCanMakeAccountCalls(callback)) {
+      return;
+    }
     this.bookContract.transferFromBase.sendTransaction(
       { from: this.getOurAddress() },
       (error, result) => {
@@ -168,6 +174,9 @@ export default class {
   }
 
   submitWithdrawBaseTransfer = (fmtAmount, callback) => {
+    if (!this.checkCanMakeAccountCalls(callback)) {
+      return;
+    }
     this.bookContract.transferBase.sendTransaction(
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
       UbiTokTypes.encodeBaseAmount(fmtAmount).valueOf(),
@@ -179,6 +188,9 @@ export default class {
   }
 
   submitDepositCntr = (fmtAmount, callback) => {
+    if (!this.checkCanMakeAccountCalls(callback)) {
+      return;
+    }
     this.bookContract.depositCntr.sendTransaction(
       {
         from: this.getOurAddress(),
@@ -191,6 +203,9 @@ export default class {
   }
 
   submitWithdrawCntr = (fmtAmount, callback) => {
+    if (!this.checkCanMakeAccountCalls(callback)) {
+      return;
+    }
     this.bookContract.withdrawCntr.sendTransaction(
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
       UbiTokTypes.encodeCntrAmount(fmtAmount).valueOf(),
@@ -204,7 +219,6 @@ export default class {
   walkBook = (fromPricePacked, callback) => {
     this.bookContract.walkBook.call(fromPricePacked, callback);
   }
-
   
   walkMyOrders = (maybeLastOrderId, callback) => {
     if (!this.checkCanMakeAccountCalls(callback)) {

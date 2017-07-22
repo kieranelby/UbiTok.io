@@ -202,6 +202,9 @@ exports.parseFriendlyPricePart = function(direction, pricePart)  {
   if (direction !== 'Buy' && direction !== 'Sell') {
     return [{msg: 'has an unknown problem'}, undefined];
   }
+  if (pricePart === undefined) {
+    return [{msg: 'is blank'}, undefined];
+  }
   let trimmedPricePart = pricePart.trim();
   if (trimmedPricePart === '') {
     return [{msg: 'is blank'}, undefined];
@@ -212,7 +215,7 @@ exports.parseFriendlyPricePart = function(direction, pricePart)  {
   }
   let number = new BigNumber(NaN);
   try {
-    number = new BigNumber(trimmedPricePart)
+    number = new BigNumber(trimmedPricePart);
   } catch (e) {
   }
   if (number.isNaN() || !number.isFinite()) {
