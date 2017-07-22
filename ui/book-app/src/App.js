@@ -2,7 +2,8 @@ import React, { Component } from 'react';
 import { Navbar, Nav, NavItem, Tab, Tabs, Well, Panel,
          Grid, Row, Col, Table,
          ButtonToolbar, Button, Glyphicon, 
-         FormGroup, FormControl, ControlLabel, HelpBlock, InputGroup } from 'react-bootstrap';
+         FormGroup, FormControl, ControlLabel, HelpBlock, InputGroup,
+         Modal } from 'react-bootstrap';
 import update from 'immutability-helper';
 
 import logo from './ubitok-logo.svg';
@@ -100,6 +101,8 @@ class App extends Component {
       "withdrawCntr": {
         "amount": "0.0"
       },
+
+      // TODO - should we try to show payment history somehow? presumably based on contract events?
       
       // the order book
 
@@ -119,16 +122,18 @@ class App extends Component {
         "buy": {
           "amountBase": "",
           "price": "",
-          "costCntr": ""
+          "costCntr": "",
+          "terms": "GTCNoGasTopup"
         },
         "sell": {
           "amountBase": "",
           "price": "",
-          "returnCntr": ""
+          "returnCntr": "",
+          "terms": "GTCNoGasTopup"
         }
       },
 
-      // orders the client has created
+      // Orders the client has created.
       // (keyed by orderId, which sorting as a string corresponds to sorting by client-claimed-creation-time)
       // Example:
       //   "Rbc23fg9" : {
@@ -143,11 +148,15 @@ class App extends Component {
       //     "rawExecutedQuoted": new BigNumber(0),
       //     "rawFeeAmount": new BigNumber(0)
       //   }
-      //
 
       "myOrders": {
       },
       "myOrdersLoaded": false,
+
+      // Whether to show the more info modal, and which order to describe in it:
+
+      "showOrderInfo": false,
+      "orderInfoOrderId": undefined,
 
       // Trades that have happened in the market (keyed by something unique).
       // Example:
@@ -206,10 +215,14 @@ class App extends Component {
     return 0;
   }
 
-  formatBase = (amount) => {
-    return UbiTokTypes.decodeBaseAmount(amount);
+  formatBase = (rawAmount) => {
+    return UbiTokTypes.decodeBaseAmount(rawAmount);
   }
 
+  formatCntr = (rawAmount) => {
+    return UbiTokTypes.decodeCntrAmount(rawAmount);
+  }
+  
   handleStatusUpdate = (error, newBridgeStatus) => {
     let oldStatus = this.lastBridgeStatus;
     if (!oldStatus.canMakePublicCalls && newBridgeStatus.canMakePublicCalls) {
@@ -498,11 +511,33 @@ class App extends Component {
     });
   }
 
+  handleCreateOrderBuyTermsChange = (e) => {
+    var v = e.target.value;
+    this.setState((prevState, props) => {
+      return {
+        createOrder: update(prevState.createOrder, {
+          buy: { terms: { $set: v } }
+        })
+      };
+    });
+  }
+  
+  handleCreateOrderSellTermsChange = (e) => {
+    var v = e.target.value;
+    this.setState((prevState, props) => {
+      return {
+        createOrder: update(prevState.createOrder, {
+          sell: { terms: { $set: v } }
+        })
+      };
+    });
+  }
+  
   handlePlaceBuyOrder = (e) => {
     var orderId = UbiTokTypes.generateDecodedOrderId();
     var price = "Buy @ " + this.state.createOrder.buy.price;
     var sizeBase = this.state.createOrder.buy.amountBase;
-    var terms = 'GTCNoGasTopup'; // TODO - take from form!
+    var terms = this.state.createOrder.buy.terms;
     let callback = (error, result) => {
       this.handlePlaceOrderCallback(orderId, error, result);
     };
@@ -515,7 +550,7 @@ class App extends Component {
     var orderId = UbiTokTypes.generateDecodedOrderId();
     var price = "Sell @ " + this.state.createOrder.sell.price;
     var sizeBase = this.state.createOrder.sell.amountBase;
-    var terms = 'GTCNoGasTopup'; // TODO - take from form!
+    var terms = this.state.createOrder.sell.terms;
     let callback = (error, result) => {
       this.handlePlaceOrderCallback(orderId, error, result);
     };
@@ -584,7 +619,20 @@ class App extends Component {
   }
   
   handleClickMoreInfo = (orderId) => {
-    // TODO - some sort of dialog or expandy thing
+    this.setState((prevState, props) => {
+      return {
+        showOrderInfo: true,
+        orderInfoOrderId: orderId
+      };
+    });
+  }
+
+  handleOrderInfoCloseClick = () => {
+    this.setState((prevState, props) => {
+      return {
+        showOrderInfo: false
+      };
+    });
   }
 
   handleClickCancelOrder = (orderId) => {
@@ -742,7 +790,7 @@ class App extends Component {
                 ) : (
                 <Well bsSize="small">
                   <Glyphicon glyph="info-sign" title="Ethereum Connection Info" />
-                  &nbsp;Using Ethereum Account {this.state.bridgeStatus.chosenAccount} on {this.state.bridgeStatus.chosenSupportedNetworkName}.
+                  &nbsp;Using Ethereum Account {this.state.bridgeStatus.chosenAccount} on {this.state.bridgeStatus.chosenSupportedNetworkName} via a local client.
                 </Well>
                 )}
               </Col>
@@ -823,7 +871,7 @@ class App extends Component {
                 <Tab.Container activeKey={this.state.paymentTabKey} onSelect={()=>{}} id="payment-tabs">
                   <Tab.Content>
                     <Tab.Pane eventKey="none" className="emptyTabPane">
-                      <i>Excludes book contract funds on open orders.</i>
+                      <i>Book balances exclude funds on open orders.</i>
                     </Tab.Pane>
                     <Tab.Pane eventKey="depositBase">
                       <p>
@@ -1065,9 +1113,9 @@ class App extends Component {
                         )}
                       </HelpBlock>
                       <ControlLabel>Terms</ControlLabel>
-                      <FormControl componentClass="select" placeholder="select">
-                        <option value="GTCNoGasTopup">Good Till Cancel</option>
-                        <option value="GTCWithGasTopup">Good Till Cancel with Gas Top Up</option>
+                      <FormControl componentClass="select" value={this.state.createOrder.buy.terms} onChange={this.handleCreateOrderBuyTermsChange}>
+                        <option value="GTCNoGasTopup">Good Till Cancel (no gas topup)</option>
+                        <option value="GTCWithGasTopup">Good Till Cancel (gas topup enabled)</option>
                         <option value="Immediate Or Cancel">Immediate Or Cancel</option>
                         <option value="MakerOnly">Maker Only</option>
                       </FormControl>
@@ -1079,7 +1127,7 @@ class App extends Component {
                         </Button>
                       </ButtonToolbar>
                       <HelpBlock>
-                        Please read our <a target="_blank" href="https://github.com/kieranelby/UbiTok.io/blob/master/docs/trading-rules.md">Trading Rules</a>.
+                        Please read our <a target="_blank" href="http://ubitok.io/trading-rules.html">Trading Rules</a> for help and terms.
                       </HelpBlock>
                     </FormGroup>
                   </Tab>
@@ -1110,9 +1158,9 @@ class App extends Component {
                         )}
                       </HelpBlock>
                       <ControlLabel>Terms</ControlLabel>
-                      <FormControl componentClass="select" placeholder="select">
-                        <option value="GTCNoGasTopup">Good Till Cancel</option>
-                        <option value="GTCWithGasTopup">Good Till Cancel with Gas Top Up</option>
+                      <FormControl componentClass="select" value={this.state.createOrder.sell.terms} onChange={this.handleCreateOrderSellTermsChange}>
+                        <option value="GTCNoGasTopup">Good Till Cancel (no gas topup)</option>
+                        <option value="GTCWithGasTopup">Good Till Cancel (gas topup enabled)</option>
                         <option value="Immediate Or Cancel">Immediate Or Cancel</option>
                         <option value="MakerOnly">Maker Only</option>
                       </FormControl>
@@ -1124,7 +1172,7 @@ class App extends Component {
                         </Button>
                       </ButtonToolbar>
                       <HelpBlock>
-                        Please read our <a target="_blank" href="https://github.com/kieranelby/UbiTok.io/blob/master/docs/trading-rules.md">Trading Rules</a>.
+                        Please read our <a target="_blank" href="http://ubitok.io/trading-rules.html">Trading Rules</a> for help and terms.
                       </HelpBlock>
                     </FormGroup>
                   </Tab>
@@ -1168,7 +1216,7 @@ class App extends Component {
                             </Button>
                             ) : undefined }
                             { (entry.status !== 'Open' && entry.status !== 'NeedsGas') ? (
-                            <Button bsSize="xsmall" bsStyle="" onClick={() => this.handleClickHideOrder(entry.orderId)}>
+                            <Button bsSize="xsmall" bsStyle="default" onClick={() => this.handleClickHideOrder(entry.orderId)}>
                               <Glyphicon glyph="eye-close" title="hide order" />
                             </Button>
                             ) : undefined }
@@ -1178,6 +1226,65 @@ class App extends Component {
                       )}
                     </tbody>
                   </Table>
+
+                  <Modal show={this.state.showOrderInfo} onHide={this.handleOrderInfoCloseClick}>
+                    <Modal.Header closeButton>
+                      <Modal.Title>Order Details</Modal.Title>
+                    </Modal.Header>
+                    { (!this.state.orderInfoOrderId) ? (<Modal.Body>No order selected.</Modal.Body>) : (
+                    <Modal.Body>
+
+                      <Table striped bordered condensed hover>
+                        <tbody>
+                          <tr>
+                            <td>Order Id</td>
+                            <td>{this.state.orderInfoOrderId}</td>
+                          </tr>
+                          <tr>
+                            <td>Created At</td>
+                            <td>&nbsp;</td>
+                          </tr>
+                          <tr>
+                            <td>Transaction</td>
+                            <td>&nbsp;</td>
+                          </tr>
+                          <tr>
+                            <td>Price</td>
+                            <td>{this.state.myOrders[this.state.orderInfoOrderId].price}</td>
+                          </tr>
+                          <tr>
+                            <td>Original Size ({this.state.pairInfo.base.symbol})</td>
+                            <td>{this.state.myOrders[this.state.orderInfoOrderId].sizeBase}</td>
+                          </tr>
+                          <tr>
+                            <td>Terms</td>
+                            <td>{this.state.myOrders[this.state.orderInfoOrderId].terms}</td>
+                          </tr>
+                          <tr>
+                            <td>Filled ({this.state.pairInfo.base.symbol})</td>
+                            <td>{this.formatBase(this.state.myOrders[this.state.orderInfoOrderId].rawExecutedBase)}</td>
+                          </tr>
+                          <tr>
+                            <td>Filled ({this.state.pairInfo.cntr.symbol})</td>
+                            <td>{this.formatCntr(this.state.myOrders[this.state.orderInfoOrderId].rawExecutedCntr)}</td>
+                          </tr>
+                          <tr>
+                            <td>Status</td>
+                            <td>{this.state.myOrders[this.state.orderInfoOrderId].status}</td>
+                          </tr>
+                          <tr>
+                            <td>Reason Code</td>
+                            <td>{this.state.myOrders[this.state.orderInfoOrderId].reasonCode}</td>
+                          </tr>
+                        </tbody>
+                      </Table>
+                    </Modal.Body>
+                    )}
+                    <Modal.Footer>
+                      <Button onClick={this.handleOrderInfoCloseClick}>Close</Button>
+                    </Modal.Footer>
+                  </Modal>
+                  
               </Col>
             </Row>
           </Grid>

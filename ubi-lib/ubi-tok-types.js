@@ -114,6 +114,8 @@ exports.minBuyPricePacked = 10800;
 exports.minSellPricePacked = 10801;
 exports.maxSellPricePacked = 21600;
 
+// e.g. 'Buy @ 1.00' -> 5401
+//
 exports.encodePrice = function (friendlyPrice) {
   var splitPrice = exports.splitFriendlyPrice(friendlyPrice);
   var direction = splitPrice[0];
@@ -135,6 +137,8 @@ exports.encodePrice = function (friendlyPrice) {
   return sidedPriceIndex;
 };
 
+// e.g. 5401 -> 'Buy @ 1.00'
+//
 exports.decodePrice = function (packedPrice) {
   if (packedPrice.toNumber) {
     packedPrice = packedPrice.toNumber()
@@ -184,8 +188,71 @@ exports.decodePrice = function (packedPrice) {
   return direction + ' @ ' + friendlyPricePart;
 };
 
+// Take the number part of a price entered by a human as a string (e.g. '1.23'),
+// along with the intended direction ('Buy' or 'Sell') (not entered by a human),
+// and turn it into either [ error, undefined] or [ undefined, result] where:
+//   error = { msg: 'problem description', suggestion: 'optional replacement'}
+//   result = [ direction, mantissa, exponent ]
+// where direction = Buy/Sell, mantissa is a number from 100-999, exponent is
+// a number from -5 to 6 as used by the book contract's packed price format.
+//
+// e.g. ('Buy', '12.3') -> [undefined, ['Buy', 123, 2]]
+//
+exports.parseFriendlyPricePart = function(direction, pricePart)  {
+  if (direction !== 'Buy' && direction !== 'Sell') {
+    return [{msg: 'has an unknown problem'}, undefined];
+  }
+  let trimmedPricePart = pricePart.trim();
+  if (trimmedPricePart === '') {
+    return [{msg: 'is blank'}, undefined];
+  }
+  let looksLikeANumber = /^[0-9]*\.?[0-9]*$/.test(trimmedPricePart);
+  if (!looksLikeANumber) {
+    return [{msg: 'does not look like a regular number'}, undefined];
+  }
+  let number = new BigNumber(NaN);
+  try {
+    number = new BigNumber(trimmedPricePart)
+  } catch (e) {
+  }
+  if (number.isNaN() || !number.isFinite()) {
+    return [{msg: 'does not look like a regular number'}, undefined];
+  }
+  const minPrice = new BigNumber('0.000001');
+  const maxPrice = new BigNumber('999000');
+  if (number.lt(minPrice)) {
+    return [{msg: 'is too small', suggestion: minPrice.toFixed()}, undefined];
+  }
+  if (number.gt(maxPrice)) {
+    return [{msg: 'is too large', suggestion: maxPrice.toFixed()}, undefined];
+  }
+  let currentPower = new BigNumber('1000000');
+  for (let exponent = 6; exponent >= -5; exponent--) {
+    if (number.gte(currentPower.times('0.1'))) {
+      let rawMantissa = number.div(currentPower);
+      let mantissa = rawMantissa.mul(1000);
+      if (mantissa.isInteger()) {
+        if (mantissa.lt(100) || mantissa.gt(999)) {
+          return [{msg: 'has an unknown problem'}, undefined];
+        }
+        return [undefined, [direction, mantissa.toNumber(), exponent]];
+      } else {
+        // round in favour of the order placer
+        let roundMode = (direction === 'Buy') ? BigNumber.ROUND_DOWN : BigNumber.ROUND_UP;
+        let roundMantissa = mantissa.round(0, roundMode);
+        let roundedNumber = roundMantissa.div(1000).mul(currentPower);
+        return [{msg: 'has too many significant figures', suggestion: roundedNumber.toFixed()}, undefined];
+      }
+    }
+    currentPower = currentPower.times('0.1');
+  }
+  return [{msg: 'has an unknown problem'}, undefined];
+}
+
+// e.g. 'Buy @ 12.3' -> ['Buy', 123, 2]
+//
 exports.splitFriendlyPrice = function(price)  {
-  var invalidSplitPrice = ['Invalid', 0, 0];
+  const invalidSplitPrice = ['Invalid', 0, 0];
   if (!price.startsWith) {
     return invalidSplitPrice;
   }
@@ -200,58 +267,12 @@ exports.splitFriendlyPrice = function(price)  {
   } else {
     return invalidSplitPrice;
   }
-  var match;
-  match = pricePart.match(/^([1-9][0-9][0-9])000$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), 6];
+  let errorAndResult = exports.parseFriendlyPricePart(direction, pricePart);
+  if (errorAndResult[0]) {
+    return invalidSplitPrice;
+  } else {
+    return errorAndResult[1];
   }
-  match = pricePart.match(/^([1-9][0-9][0-9])00$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), 5];
-  }
-  match = pricePart.match(/^([1-9][0-9][0-9])0$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), 4];
-  }
-  match = pricePart.match(/^([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), 3];
-  }
-  // TODO - handle no decimal point (e.g. 1-99) ...
-  // TODO - handle missing trailing zeroes ...
-  match = pricePart.match(/^([1-9][0-9])\.([0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10) * 10 + parseInt(match[2], 10), 2];
-  }
-  match = pricePart.match(/^([1-9])\.([0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10) * 100 + parseInt(match[2], 10), 1];
-  }
-  match = pricePart.match(/^0\.([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), 0];
-  }
-  match = pricePart.match(/^0\.0([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), -1];
-  }
-  match = pricePart.match(/^0\.00([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), -2];
-  }
-  match = pricePart.match(/^0\.000([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), -3];
-  }
-  match = pricePart.match(/^0\.0000([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), -4];
-  }
-  match = pricePart.match(/^0\.00000([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), -5];
-  }
-  return invalidSplitPrice;
 };
 
 exports.decodeAmount = function(amountWei, decimals) {
