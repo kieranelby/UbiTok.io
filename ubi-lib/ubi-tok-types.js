@@ -336,6 +336,7 @@ exports.generateEncodedOrderId = function() {
   //  - extract creation time from order (for display to creator only!)
   // So we:
   //  - use client seconds since epoch (32bit) * 2^96 + 96 bits of client randomness
+  // TODO: errm, yes, this has Y2K38 bug
   let date = new Date();
   let fullUuidWithoutDashes = uuidv4().replace(/-/g, '');
   return exports.computeEncodedOrderId(date, fullUuidWithoutDashes);
@@ -347,6 +348,13 @@ exports.generateDecodedOrderId = function() {
 
 exports.deliberatelyInvalidEncodedOrderId = function() {
   return new BigNumber(0);
+};
+
+exports.extractClientDateFromDecodedOrderId = function(friendlyOrderId) {
+  let encodedOrderId = exports.encodeOrderId(friendlyOrderId);
+  let multiplier = (new BigNumber(2)).toPower(96);
+  let datePartSeconds = encodedOrderId.div(multiplier).floor();
+  return new Date(datePartSeconds.times(1000).toNumber());
 };
 
 // Suitable for use with walkClientOrders().
@@ -382,6 +390,7 @@ exports.decodeMarketOrderEvent = function(result) {
       blockNumber: result.blockNumber,
       logIndex: result.logIndex,
       eventRemoved: result.removed,
+      eventTimestamp: new Date(1000.0 * result.args.eventTimestamp.toNumber()),
       marketOrderEventType: exports.decodeMarketOrderEventType(result.args.marketOrderEventType),
       orderId: exports.decodeOrderId(result.args.orderId),
       pricePacked: result.args.price.toNumber(),

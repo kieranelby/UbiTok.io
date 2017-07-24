@@ -123,6 +123,7 @@ contract BookERC20EthV1 {
   }
 
   event MarketOrderEvent(
+    uint256 indexed eventTimestamp,
     uint128 indexed orderId,
     MarketOrderEventType marketOrderEventType,
     uint16 price,
@@ -591,7 +592,7 @@ contract BookERC20EthV1 {
     }
     if (status == Status.Open) {
       removeOpenOrderFromBook(orderId);
-      MarketOrderEvent(orderId, MarketOrderEventType.Remove, order.price,
+      MarketOrderEvent(block.timestamp, orderId, MarketOrderEventType.Remove, order.price,
         order.sizeBase - order.executedBase);
     }
     refundUnmatchedAndFinish(orderId, Status.Done, ReasonCode.ClientCancel);
@@ -978,10 +979,10 @@ contract BookERC20EthV1 {
     }
     if (theirOrder.executedBase >= theirOrder.sizeBase - baseMinRemainingSize) {
       refundUnmatchedAndFinish(theirOrderId, Status.Done, ReasonCode.None);
-      MarketOrderEvent(theirOrderId, MarketOrderEventType.CompleteFill, theirPrice, matchBase);
+      MarketOrderEvent(block.timestamp, theirOrderId, MarketOrderEventType.CompleteFill, theirPrice, matchBase);
       return true;
     } else {
-      MarketOrderEvent(theirOrderId, MarketOrderEventType.PartialFill, theirPrice, matchBase);
+      MarketOrderEvent(block.timestamp, theirOrderId, MarketOrderEventType.PartialFill, theirPrice, matchBase);
       return false;
     }
   }
@@ -1037,7 +1038,7 @@ contract BookERC20EthV1 {
       existingLastOrderChainNode.nextOrderId = orderId;
       orderChain.lastOrderId = orderId;
     }
-    MarketOrderEvent(orderId, MarketOrderEventType.Add, price, order.sizeBase - order.executedBase);
+    MarketOrderEvent(block.timestamp, orderId, MarketOrderEventType.Add, price, order.sizeBase - order.executedBase);
     order.status = Status.Open;
   }
 

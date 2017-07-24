@@ -2,9 +2,21 @@ var expect = require("chai").expect;
 var UbiTokTypes = require("../ubi-tok-types");
 
 describe("UbiTokTypes", function() {
+  describe("Order Ids", function() {
+    it("encodes creation date into order id and extracts it again", function() {
+      let uut = UbiTokTypes;
+      // not guaranteed to preserve sub-second precision mind you
+      let exampleDate = new Date(2018, 0, 15, 10, 15, 23);
+      let notVeryRandomHex = '01020304';
+      let encodedOrderId = uut.computeEncodedOrderId(exampleDate, notVeryRandomHex);
+      let friendlyOrderId = uut.decodeOrderId(encodedOrderId);
+      let recoveredDate = uut.extractClientDateFromDecodedOrderId(friendlyOrderId);
+      expect(recoveredDate.getTime(), 'date extracted from order id').to.equal(exampleDate.getTime());
+    });
+  });
   describe("Price Parsing", function() {
     it("parses prices", function() {
-      var uut = UbiTokTypes;
+      let uut = UbiTokTypes;
       let testGood = function (pricePart, expectedMantissa, expectedExponent) {
         for (let direction of ['Buy', 'Sell']) {
           let result = uut.parseFriendlyPricePart(direction, pricePart);

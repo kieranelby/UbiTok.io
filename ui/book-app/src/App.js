@@ -6,11 +6,15 @@ import { Navbar, Nav, NavItem, Tab, Tabs, Well, Panel,
          Modal } from 'react-bootstrap';
 import update from 'immutability-helper';
 
+import Spinner from 'react-spinkit';
+
 import logo from './ubitok-logo.svg';
 import metamaskLogo from './metamask.png';
 import mistLogo from './mist.png';
-//import mockPriceChart from './mock-price-chart.svg';
+
 import './App.css';
+
+import moment from 'moment';
 
 import Bridge from './bridge.js'
 import UbiTokTypes from 'ubi-lib/ubi-tok-types.js';
@@ -38,6 +42,9 @@ class App extends Component {
     this.marketEventQueue = [];
 
     this.state = {
+
+      // current time (helps testability vs. straight new Date())
+      "clock": new Date(),
 
       // are we connected to Ethereum network? which network? what account?
 
@@ -131,7 +138,6 @@ class App extends Component {
       // Example:
       //   "Rbc23fg9" : {
       //     "orderId": "Rbc23fg9",
-      //     // TODO - need some sort of guess as to when placed here?
       //     "price": price,
       //     "sizeBase": sizeBase,
       //     "terms": terms,
@@ -156,8 +162,9 @@ class App extends Component {
       //
       //  "123-99": {
       //    "marketTradeId": "123-99",
-      //    "blockNumber": 123,
-      //    "logIndex": 99
+      //    "blockNumber": 123, // only used for sorting, might remove
+      //    "logIndex": 99, //  // only used for sorting, might remove
+      //    "eventTimestamp": <a js Date>,
       //    "makerOrderId":"Rb101x",
       //    "makerPrice":"Buy @ 0.00000123",
       //    "executedBase":"50.0",
@@ -166,10 +173,19 @@ class App extends Component {
       
       "marketTrades": {
       }
-
     };
     this.bridge.subscribeStatus(this.handleStatusUpdate);
     window.setInterval(this.pollExchangeBalances, 2000);
+    window.setInterval(this.updateClock, 1000);
+    // TODO - set-up timers to purge old inactive my orders + market trades if too many
+  }
+
+  updateClock = () => {
+    this.setState((prevState, props) => {
+      return {
+        clock: new Date()
+      }
+    });
   }
 
   getMySortedOrders = () => {
@@ -214,6 +230,31 @@ class App extends Component {
 
   formatCntr = (rawAmount) => {
     return UbiTokTypes.decodeCntrAmount(rawAmount);
+  }
+
+  chooseClassNameForPrice = (price) => {
+    if (price.startsWith('Buy')) {
+      return 'buyPrice';
+    } else if (price.startsWith('Sell')) {
+      return 'sellPrice'
+    } else {
+      return 'invalidPrice';
+    }
+  }
+
+  formatEventDate = (eventDate) => {
+    if (!eventDate) return '';
+    let then = moment(eventDate);
+    let now = moment(this.state.clock);
+    if (then.isAfter(now)) {
+      return 'just now';
+    }
+    return moment(eventDate).from(moment(this.state.clock));
+  }
+
+  formatCreationDateOf = (orderId) => {
+    let creationDate = UbiTokTypes.extractClientDateFromDecodedOrderId(orderId);
+    return this.formatEventDate(creationDate);
   }
   
   handleStatusUpdate = (error, newBridgeStatus) => {
@@ -308,6 +349,7 @@ class App extends Component {
         marketTradeId: "" + event.blockNumber + "-" + event.logIndex,
         blockNumber: event.blockNumber,
         logIndex: event.logIndex,
+        eventTimestamp: event.eventTimestamp,
         makerOrderId: event.orderId,
         makerPrice: UbiTokTypes.decodePrice(event.pricePacked),
         executedBase: this.formatBase(event.rawAmountBase),
@@ -485,7 +527,6 @@ class App extends Component {
       let rawFees = rawAmountBase.times('0.0005');
       helpMsg = 'A fee of up to ' + UbiTokTypes.decodeBaseAmount(rawFees) + ' ' + this.state.pairInfo.base.symbol + ' may be deducted';
     }
-    // TODO - for sell need to verify they have enough base balance ...
     return ['success', helpMsg];
   }
 
@@ -663,6 +704,13 @@ class App extends Component {
     this.bridge.submitCreateOrder(orderId, price, sizeBase, terms, callback);
     var newOrder = this.fillInSendingOrder(orderId, price, sizeBase, terms);
     this.createMyOrder(newOrder);
+    this.setState((prevState, props) => {
+      return {
+        createOrder: update(prevState.createOrder, {
+          buy: { inProgress: { $set: true } }
+        })
+      };
+    });
   }
 
   handlePlaceSellOrder = (e) => {
@@ -767,6 +815,14 @@ class App extends Component {
       this.handleModifyOrderCallback(orderId, error, result);
     };
     this.bridge.submitContinueOrder(orderId, callback);
+  }
+
+  handleClickHideOrder = (orderId) => {
+    this.setState((prevState, props) => {
+      return {
+        myOrders: update(prevState.myOrders, {$unset: [orderId]})
+      };
+    });
   }
   
   handleDepositBaseNewApprovedAmountChange = (e) => {
@@ -1146,7 +1202,7 @@ class App extends Component {
                     <tbody>
                       {this.state.book.asks.map((entry) =>
                       <tr key={entry[0]}>
-                        <td className="sell">{entry[0]}</td>
+                        <td className={this.chooseClassNameForPrice(entry[0])}>{entry[0]}</td>
                         <td>{entry[1]}</td>
                         <td>{entry[2]}</td>
                       </tr>
@@ -1164,7 +1220,7 @@ class App extends Component {
                     <tbody>
                       {this.state.book.bids.map((entry) =>
                       <tr key={entry[0]}>
-                        <td className="buy">{entry[0]}</td>
+                        <td className={this.chooseClassNameForPrice(entry[0])}>{entry[0]}</td>
                         <td>{entry[1]}</td>
                         <td>{entry[2]}</td>
                       </tr>
@@ -1192,8 +1248,8 @@ class App extends Component {
                         .map((marketTradeId) => this.state.marketTrades[marketTradeId])
                         .map((entry) =>
                       <tr key={entry.marketTradeId}>
-                        <td>2 hours ago</td>
-                        <td className="buy">{entry.makerPrice}</td>
+                        <td>{this.formatEventDate(entry.eventTimestamp)}</td>
+                        <td className={this.chooseClassNameForPrice(entry.makerPrice)}>{entry.makerPrice}</td>
                         <td>{entry.executedBase}</td>
                       </tr>
                       )}
@@ -1205,7 +1261,7 @@ class App extends Component {
               <Col md={4}>
                 <h3>Create Order</h3>
                 <Tabs activeKey={this.state.createOrder.side} onSelect={this.handleCreateOrderSideSelect} id="create-order-side">
-                  <Tab eventKey={"buy"} title={"BUY " + this.state.pairInfo.base.symbol}>
+                  <Tab eventKey="buy" title={"BUY " + this.state.pairInfo.base.symbol}>
                     <FormGroup controlId="createOrderBuyAmount" validationState={this.getCreateOrderAmountValidationResult('Buy')[0]}>
                       <InputGroup>
                         <InputGroup.Addon>Amount</InputGroup.Addon>
@@ -1245,15 +1301,19 @@ class App extends Component {
                       <FormControl componentClass="select" value={this.state.createOrder.buy.terms} onChange={this.handleCreateOrderBuyTermsChange}>
                         <option value="GTCNoGasTopup">Good Till Cancel (no gas topup)</option>
                         <option value="GTCWithGasTopup">Good Till Cancel (gas topup enabled)</option>
-                        <option value="Immediate Or Cancel">Immediate Or Cancel</option>
+                        <option value="ImmediateOrCancel">Immediate Or Cancel</option>
                         <option value="MakerOnly">Maker Only</option>
                       </FormControl>
                       <HelpBlock>{this.getCreateOrderTermsValidationResult('Buy')[1]}</HelpBlock>
                     </FormGroup>
                     <FormGroup>
                       <ButtonToolbar>
-                        <Button bsStyle="primary" onClick={this.handlePlaceBuyOrder}>
-                          Place Buy Order
+                        <Button bsStyle="primary" onClick={this.handlePlaceBuyOrder} disabled={this.state.createOrder.buy.inProgress}>
+                          {(this.state.createOrder.buy.inProgress) ? (
+                            <span><Glyphicon glyph="send" /> Sending ...</span>
+                          ) : (
+                            <span>Place Buy Order</span>
+                          )}
                         </Button>
                       </ButtonToolbar>
                       <HelpBlock>
@@ -1301,7 +1361,7 @@ class App extends Component {
                       <FormControl componentClass="select" value={this.state.createOrder.sell.terms} onChange={this.handleCreateOrderSellTermsChange}>
                         <option value="GTCNoGasTopup">Good Till Cancel (no gas topup)</option>
                         <option value="GTCWithGasTopup">Good Till Cancel (gas topup enabled)</option>
-                        <option value="Immediate Or Cancel">Immediate Or Cancel</option>
+                        <option value="ImmediateOrCancel">Immediate Or Cancel</option>
                         <option value="MakerOnly">Maker Only</option>
                       </FormControl>
                       <HelpBlock>{this.getCreateOrderTermsValidationResult('Sell')[1]}</HelpBlock>
@@ -1335,11 +1395,15 @@ class App extends Component {
                     <tbody>
                       {this.getMySortedOrders().map((entry) =>
                       <tr key={entry.orderId}>
-                        <td>5 mins ago</td>
-                        {/* TODO - choose buy/sell */}
-                        <td className="buy">{entry.price}</td>
+                        <td>{this.formatCreationDateOf(entry.orderId)}</td>
+                        <td className={this.chooseClassNameForPrice(entry.price)}>{entry.price}</td>
                         <td>{entry.sizeBase}</td>
-                        <td>{entry.status}</td>
+                        <td>
+                          { (entry.status === 'Sending') ? (
+                          <Spinner name="line-scale" color="purple"/>
+                          ) : undefined }
+                          {entry.status}
+                        </td>
                         <td>{this.formatBase(entry.rawExecutedBase)}</td>
                         <td>
                           <ButtonToolbar>
@@ -1383,7 +1447,7 @@ class App extends Component {
                           </tr>
                           <tr>
                             <td>Created At</td>
-                            <td>&nbsp;</td>
+                            <td>{this.formatCreationDateOf(this.state.orderInfoOrderId)}</td>
                           </tr>
                           <tr>
                             <td>Transaction</td>
@@ -1391,7 +1455,9 @@ class App extends Component {
                           </tr>
                           <tr>
                             <td>Price</td>
-                            <td>{this.state.myOrders[this.state.orderInfoOrderId].price}</td>
+                            <td className={this.chooseClassNameForPrice(this.state.myOrders[this.state.orderInfoOrderId].price)}>
+                              {this.state.myOrders[this.state.orderInfoOrderId].price}
+                            </td>
                           </tr>
                           <tr>
                             <td>Original Size ({this.state.pairInfo.base.symbol})</td>
@@ -1409,6 +1475,17 @@ class App extends Component {
                             <td>Filled ({this.state.pairInfo.cntr.symbol})</td>
                             <td>{this.formatCntr(this.state.myOrders[this.state.orderInfoOrderId].rawExecutedCntr)}</td>
                           </tr>
+                          { (this.state.myOrders[this.state.orderInfoOrderId].price.startsWith('Buy')) ? (
+                          <tr>
+                            <td>Fees ({this.state.pairInfo.base.symbol})</td>
+                            <td>{this.formatCntr(this.state.myOrders[this.state.orderInfoOrderId].rawFees)}</td>
+                          </tr>
+                          ) : (
+                          <tr>
+                            <td>Fees ({this.state.pairInfo.cntr.symbol})</td>
+                            <td>{this.formatCntr(this.state.myOrders[this.state.orderInfoOrderId].rawFees)}</td>
+                          </tr>
+                          ) }
                           <tr>
                             <td>Status</td>
                             <td>{this.state.myOrders[this.state.orderInfoOrderId].status}</td>
