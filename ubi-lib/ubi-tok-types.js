@@ -69,6 +69,7 @@ function decodeEnum(enumNamedValues, encodedValue) {
 };
 
 exports.BigNumber = BigNumber;
+exports.uuidv4 = uuidv4;
 
 exports.encodeDirection = function (directionName) {
   return encodeEnum(enumDirection, directionName);

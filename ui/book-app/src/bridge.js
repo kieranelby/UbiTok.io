@@ -2,7 +2,40 @@
 import Web3 from 'web3';
 import UbiTokTypes from 'ubi-lib/ubi-tok-types.js';
 
-export default class {
+class TransactionWatcher {
+
+  constructor(web3, callback) {
+    this.web3 = web3;
+    this.callback = callback;
+    this.txnHash = undefined;
+  }
+  
+  handleTxn = (error, result) => {
+    if (error) {
+      this.callback(error, undefined);
+      return;
+    }
+    this.txnHash = result;
+    this.callback(undefined, {event: 'GotTxnHash', txnHash: this.txnHash});
+    this._pollTxn();
+  }
+
+  _pollTxn = () => {
+    this.web3.eth.getTransactionReceipt(this.txnHash, this._handleTxnReceipt);
+  }
+
+  _handleTxnReceipt = (error, result) => {
+    if (!result) {
+      window.setTimeout(this._pollTxn, 3000);
+      return;
+    } else {
+      this.callback(undefined, {event: 'Mined'});
+    }
+  }
+
+}
+
+class Bridge {
 
   constructor() {
     this.web3 = undefined;
@@ -155,9 +188,7 @@ export default class {
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
       UbiTokTypes.encodeBaseAmount(fmtAmount).valueOf(),
       { from: this.getOurAddress() },
-      (error, result) => {
-        console.log('submitDepositBaseApprove', error, result)
-      }
+      (new TransactionWatcher(this.web3, callback)).handleTxn
     );
   }
 
@@ -167,9 +198,7 @@ export default class {
     }
     this.bookContract.transferFromBase.sendTransaction(
       { from: this.getOurAddress() },
-      (error, result) => {
-        console.log('submitDepositBaseCollect', error, result)
-      }
+      (new TransactionWatcher(this.web3, callback)).handleTxn
     );
   }
 
@@ -181,9 +210,7 @@ export default class {
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
       UbiTokTypes.encodeBaseAmount(fmtAmount).valueOf(),
       { from: this.getOurAddress() },
-      (error, result) => {
-        console.log('submitWithdrawBaseTransfer', error, result)
-      }
+      (new TransactionWatcher(this.web3, callback)).handleTxn
     );
   }
 
@@ -196,9 +223,7 @@ export default class {
         from: this.getOurAddress(),
         value: UbiTokTypes.encodeCntrAmount(fmtAmount)
       },
-      (error, result) => {
-        console.log('submitDepositCntr', error, result)
-      }
+      (new TransactionWatcher(this.web3, callback)).handleTxn
     );
   }
 
@@ -210,9 +235,7 @@ export default class {
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
       UbiTokTypes.encodeCntrAmount(fmtAmount).valueOf(),
       { from: this.getOurAddress() },
-      (error, result) => {
-        console.log('submitWithdrawCntr', error, result)
-      }
+      (new TransactionWatcher(this.web3, callback)).handleTxn
     );
   }
   
@@ -260,42 +283,10 @@ export default class {
       UbiTokTypes.encodeTerms(fmtTerms).valueOf(),
       maxMatches,
       { from: this.getOurAddress(), gas: gasAmount },
-      (error, result) => {
-        this.handleOrderTxnHash(fmtOrderId, 'Create', callback, error, result);
-      }
+      (new TransactionWatcher(this.web3, callback)).handleTxn
     );
   }
 
-  handleOrderTxnHash = (fmtOrderId, verb, orderCallback, error, txnHash) => {
-    if (error) {
-      // TODO - yeah but what if the error is that we lost network
-      // after submitting it! Perhaps be better just to poll orderId?
-      orderCallback(error, undefined);
-    } else {
-      this.handleOrderTxnReceipt(fmtOrderId, verb, orderCallback, undefined, txnHash, undefined);
-    }
-  }
-
-  handleOrderTxnReceipt = (fmtOrderId, verb, orderCallback, error, txnHash, maybeTxnReceipt) => {
-    if (error) {
-      orderCallback(error, undefined);
-    } else {
-      if (!maybeTxnReceipt) {
-        console.log('polling for txn', fmtOrderId, txnHash);
-        setTimeout(() => {
-          this.web3.eth.getTransactionReceipt(txnHash,
-            (error2, result2) => {
-              this.handleOrderTxnReceipt(fmtOrderId, verb, orderCallback, error2, txnHash, result2)
-            });
-          }, 5000
-        );
-      } else {
-        console.log('hooray - mined', fmtOrderId, maybeTxnReceipt);
-        this.getOrderState(fmtOrderId, orderCallback);
-      }
-    }
-  }
-  
   submitContinueOrder = (fmtOrderId, callback) => {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
@@ -308,9 +299,7 @@ export default class {
       UbiTokTypes.encodeOrderId(fmtOrderId).valueOf(),
       maxMatches,
       { from: this.getOurAddress(), gas: gasAmount },
-      (error, result) => {
-        this.handleOrderTxnHash(fmtOrderId, 'Continue', callback, error, result);
-      }
+      (new TransactionWatcher(this.web3, callback)).handleTxn
     );
   }
 
@@ -324,9 +313,7 @@ export default class {
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
       UbiTokTypes.encodeOrderId(fmtOrderId).valueOf(),
       { from: this.getOurAddress(), gas: gasAmount },
-      (error, result) => {
-        this.handleOrderTxnHash(fmtOrderId, 'Cancel', callback, error, result);
-      }
+      (new TransactionWatcher(this.web3, callback)).handleTxn
     );
   }
 
@@ -339,14 +326,6 @@ export default class {
         callback(undefined, UbiTokTypes.decodeOrderState(fmtOrderId, result));
       }
     });
-  }
-
-  // TODO - replace with walk function
-  getAllOrderIds = (callback) => {
-    if (!this.checkCanMakeAccountCalls(callback)) {
-      return;
-    }
-    // TODO
   }
 
   subscribeFutureMarketEvents = (callback) => {
@@ -380,3 +359,5 @@ export default class {
   }
 
 }
+
+export { Bridge as default }

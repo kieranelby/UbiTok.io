@@ -38,3 +38,8 @@
 #payment-tabs {
   border-bottom: 1px solid #ddd;
 }
+
+.tinyHex {
+  font-size: 8pt;
+  font-family: monospace;
+}

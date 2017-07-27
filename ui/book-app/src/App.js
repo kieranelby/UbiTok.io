@@ -12,6 +12,9 @@ import logo from './ubitok-logo.svg';
 import metamaskLogo from './metamask.png';
 import mistLogo from './mist.png';
 
+import SendingButton from './sending-button.js';
+import EthTxnLink from './eth-txn-link.js';
+
 import './App.css';
 
 import moment from 'moment';
@@ -102,7 +105,23 @@ class App extends Component {
         "amount": "0.0"
       },
 
-      // TODO - should we try to show payment history somehow? presumably based on contract events?
+      // this isn't persistent, we only show payments made in this session
+      // (suppose could use brower storage?)
+      //
+      // example:
+      // [{
+      //   pmtId: 1534567345673463,
+      //   createdAt: new Date(..),
+      //   txnHash: undefined | "0x5f757...",
+      //   action: "Deposit ETH",
+      //   amount: "10.00",
+      //   pmtStatus: "Sending" | "FailedSend" | "Complete"
+      // }]
+      //
+
+      "paymentHistory" : [
+
+      ],
       
       // the order book
 
@@ -138,14 +157,16 @@ class App extends Component {
       // Example:
       //   "Rbc23fg9" : {
       //     "orderId": "Rbc23fg9",
-      //     "price": price,
-      //     "sizeBase": sizeBase,
-      //     "terms": terms,
-      //     "status": "New",
+      //     "price": "Buy @ 2.00",
+      //     "sizeBase": "1000.0",
+      //     "terms": "GTCNoTopup",
+      //     "status": "Open",
       //     "reasonCode": "None",
       //     "rawExecutedBase": new BigNumber(0),
       //     "rawExecutedQuoted": new BigNumber(0),
-      //     "rawFeeAmount": new BigNumber(0)
+      //     "rawFeeAmount": new BigNumber(0),
+      //     "modifyInProgress": "Cancelling"
+      //     "txnHash": undefined,
       //   }
 
       "myOrders": {
@@ -175,17 +196,29 @@ class App extends Component {
       }
     };
     this.bridge.subscribeStatus(this.handleStatusUpdate);
-    window.setInterval(this.pollExchangeBalances, 2000);
+    window.setInterval(this.pollExchangeBalances, 3000);
     window.setInterval(this.updateClock, 1000);
-    // TODO - set-up timers to purge old inactive my orders + market trades if too many
+    window.setInterval(this.purgeExcessData, 5000);
   }
 
+  panic = (msg) => {
+    this.warn(msg);
+  }
+
+  warn = (msg) => {
+    console.log(msg);
+  }
+  
   updateClock = () => {
     this.setState((prevState, props) => {
       return {
         clock: new Date()
       }
     });
+  }
+
+  purgeExcessData = () => {
+    // TODO - avoid too many closed my orders + too many market trades
   }
 
   getMySortedOrders = () => {
@@ -517,7 +550,8 @@ class App extends Component {
     }
     if (direction === 'Sell') {
       let availableBalance = this.state.balances.exchange[0];
-      if (rawAmountBase.gt(UbiTokTypes.encodeBaseAmount(availableBalance))) {
+      if (availableBalance !== undefined && 
+          rawAmountBase.gt(UbiTokTypes.encodeBaseAmount(availableBalance))) {
         return ['error', 'Your Book Contract ' + this.state.pairInfo.base.symbol +
           ' balance is too low, try a smaller amount or deposit more funds'];
       }
@@ -568,7 +602,8 @@ class App extends Component {
       return ['error', 'Cost is too large, try a smaller amount'];
     }
     let availableBalance = this.state.balances.exchange[1];
-    if (rawCost.gt(UbiTokTypes.encodeCntrAmount(availableBalance))) {
+    if (availableBalance !== undefined &&
+        rawCost.gt(UbiTokTypes.encodeCntrAmount(availableBalance))) {
       return ['error', 'Your Book Contract ' + this.state.pairInfo.cntr.symbol +
         ' balance is too low, try a smaller amount or deposit more funds' +
         ' (remember to leave a little in your account for gas)', displayedCost];
@@ -704,13 +739,6 @@ class App extends Component {
     this.bridge.submitCreateOrder(orderId, price, sizeBase, terms, callback);
     var newOrder = this.fillInSendingOrder(orderId, price, sizeBase, terms);
     this.createMyOrder(newOrder);
-    this.setState((prevState, props) => {
-      return {
-        createOrder: update(prevState.createOrder, {
-          buy: { inProgress: { $set: true } }
-        })
-      };
-    });
   }
 
   handlePlaceSellOrder = (e) => {
@@ -761,17 +789,35 @@ class App extends Component {
       reasonCode: "None",
       rawExecutedBase: new BigNumber(0),
       rawExecutedCntr: new BigNumber(0),
-      rawFees: new BigNumber(0)
+      rawFees: new BigNumber(0),
+      modifyInProgress: undefined,
+      txnHash: undefined
     };
+  }
+
+  refreshOrder = (orderId) => {
+    this.bridge.getOrderState(orderId, (error, result) => {
+      if (error) {
+        this.warn(error);
+        // TODO - retry?
+        return;
+      }
+      if (result) {
+        this.updateMyOrder(orderId, result);
+      }
+    });
   }
 
   handlePlaceOrderCallback = (orderId, error, result) => {
     console.log('might have placed order', orderId, error, result);
     if (error) {
-      // TODO - but could have been placed despite error?
       this.updateMyOrder(orderId, { status: "FailedSend" });
     } else {
-      this.updateMyOrder(orderId, result);
+      if (result.event === 'GotTxnHash') {
+        this.updateMyOrder(orderId, {txnHash: result.txnHash});
+      } else if (result.event === 'Mined') {
+        this.refreshOrder(orderId);
+      }
     }
   }
 
@@ -779,9 +825,15 @@ class App extends Component {
     console.log('might have done something to order', orderId, error, result);
     var existingOrder = this.state.myOrders[orderId];
     if (error) {
-      // todo - wot
+      this.updateMyOrder(orderId, { modifyInProgress: undefined });
     } else {
-      this.updateMyOrder(orderId, result);
+      if (result.event === 'GotTxnHash') {
+        // TODO - suppose should try to convey the txn hash for cancel/continue somehow
+      } else if (result.event === 'Mined') {
+        // TODO - but what if someone does multiple cancels/continues ...
+        this.updateMyOrder(orderId, { modifyInProgress: undefined });
+        this.refreshOrder(orderId);
+      }
     }
   }
   
@@ -803,10 +855,10 @@ class App extends Component {
   }
 
   handleClickCancelOrder = (orderId) => {
-    // TODO - think we should have a better mechanism for this
     let callback = (error, result) => {
       this.handleModifyOrderCallback(orderId, error, result);
     };
+    this.updateMyOrder(orderId, {modifyInProgress: "Cancelling"});
     this.bridge.submitCancelOrder(orderId, callback);
   }
 
@@ -814,6 +866,7 @@ class App extends Component {
     let callback = (error, result) => {
       this.handleModifyOrderCallback(orderId, error, result);
     };
+    this.updateMyOrder(orderId, {modifyInProgress: "Continuing"});
     this.bridge.submitContinueOrder(orderId, callback);
   }
 
@@ -837,11 +890,17 @@ class App extends Component {
   }
 
   handleDepositBaseSetApprovedAmountClick = () => {
-    this.bridge.submitDepositBaseApprove(this.state.depositBase.newApprovedAmount, (error, result) => {});
+    // TODO - amount validation, check account unlocked
+    let pmtId = this.createPaymentEntry('Approve ' + this.state.pairInfo.base.symbol, this.state.depositBase.newApprovedAmount);
+    this.bridge.submitDepositBaseApprove(this.state.depositBase.newApprovedAmount,
+      (error, result) => { this.handlePaymentCallback(pmtId, error, result) });
   }
 
   handleDepositBaseCollectClick = () => {
-    this.bridge.submitDepositBaseCollect((error, result) => {});
+    // TODO - amount validation, check account unlocked
+    let pmtId = this.createPaymentEntry('Collect ' + this.state.pairInfo.base.symbol, 'N/A');
+    this.bridge.submitDepositBaseCollect(
+      (error, result) => { this.handlePaymentCallback(pmtId, error, result) });
   }
 
   handleWithdrawBaseAmountChange = (e) => {
@@ -856,7 +915,10 @@ class App extends Component {
   }  
   
   handleWithdrawBaseClick = () => {
-    this.bridge.submitWithdrawBaseTransfer(this.state.withdrawBase.amount, (error, result) => {});
+    // TODO - amount validation, check account unlocked
+    let pmtId = this.createPaymentEntry('Withdraw ' + this.state.pairInfo.base.symbol, this.state.withdrawBase.amount);
+    this.bridge.submitWithdrawBaseTransfer(this.state.withdrawBase.amount,
+      (error, result) => { this.handlePaymentCallback(pmtId, error, result) });
   }  
 
   handleDepositCntrAmountChange = (e) => {
@@ -871,7 +933,10 @@ class App extends Component {
   }  
   
   handleDepositCntrClick = () => {
-    this.bridge.submitDepositCntr(this.state.depositCntr.amount, (error, result) => {});
+    // TODO - amount validation, check account unlocked
+    let pmtId = this.createPaymentEntry('Deposit ' + this.state.pairInfo.cntr.symbol, this.state.depositCntr.amount);
+    this.bridge.submitDepositCntr(this.state.depositCntr.amount,
+      (error, result) => { this.handlePaymentCallback(pmtId, error, result) });
   }  
 
   handleWithdrawCntrAmountChange = (e) => {
@@ -886,8 +951,67 @@ class App extends Component {
   }  
   
   handleWithdrawCntrClick = () => {
-    this.bridge.submitWithdrawCntr(this.state.withdrawCntr.amount, (error, result) => {});
-  }  
+    // TODO - amount validation, check account unlocked
+    let pmtId = this.createPaymentEntry('Withdraw ' + this.state.pairInfo.cntr.symbol, this.state.withdrawCntr.amount);
+    this.bridge.submitWithdrawCntr(this.state.withdrawCntr.amount,
+      (error, result) => { this.handlePaymentCallback(pmtId, error, result) });
+  }
+
+  handlePaymentCallback = (pmtId, error, result) => {
+    if (error) {
+      this.updatePaymentEntry(pmtId, {pmtStatus: 'FailedSend'});
+      return;
+    } else {
+      if (result.event === 'GotTxnHash') {
+        this.updatePaymentEntry(pmtId, {txnHash: result.txnHash});
+      } else if (result.event === 'Mined') {
+        this.updatePaymentEntry(pmtId, {pmtStatus: 'Mined'});
+      }
+    }
+  }
+
+  handleClickHidePayment = (pmtId) => {
+    this.setState((prevState, props) => {
+      return {
+        paymentHistory: prevState.paymentHistory.filter((entry) => {
+          return entry.pmtId !== pmtId;
+        })
+      };
+    });
+  }
+
+  createPaymentEntry = (action, amount) => {
+    let pmtId = UbiTokTypes.uuidv4();
+    let createdAt = new Date();
+    var newEntry = {
+      pmtId: pmtId,
+      createdAt: createdAt,
+      txnHash: undefined,
+      action: action,
+      amount: amount,
+      pmtStatus: 'Sending'
+    };
+    this.setState((prevState, props) => {
+      return {
+        paymentHistory: update(prevState.paymentHistory, { $unshift: [newEntry] })
+      };
+    });
+    return pmtId;
+  }
+
+  updatePaymentEntry = (pmtId, partialPmtEntry) => {
+    this.setState((prevState, props) => {
+      return {
+        paymentHistory: prevState.paymentHistory.map((entry) => {
+          if (entry.pmtId !== pmtId) {
+            return entry;
+          } else {
+            return update(entry, {$merge: partialPmtEntry});
+          }
+        })
+      };
+    });
+  }
   
   render() {
     return (
@@ -1041,12 +1165,38 @@ class App extends Component {
                       <td>Your Account</td>
                       <td>{this.state.balances.wallet[1]}</td>
                     </tr>
+                    { (this.state.paymentHistory.length > 0) ? (
+                      <tr>
+                        <th colSpan="2">History</th>
+                      </tr>
+                    ) : undefined }
+                    {this.state.paymentHistory.map((entry) =>
+                      <tr key={entry.pmtId}>
+                        <td>
+                          { (entry.pmtStatus === 'Sending') ? (
+                            <Spinner name="line-scale" color="purple"/>
+                          ) : null }
+                          { (entry.pmtStatus === 'FailedSend') ? (
+                            <Glyphicon glyph="warning-sign" text="failed to send payment" />
+                          ) : null }
+                          <EthTxnLink txnHash={entry.txnHash} networkName={this.state.bridgeStatus.chosenSupportedNetworkName} />
+                          {entry.action}
+                        </td>
+                        <td>
+                          {entry.amount}
+                          { (entry.pmtStatus !== 'Sending') ? (
+                          <Button bsSize="xsmall" className="pull-right" bsStyle="default" onClick={() => this.handleClickHidePayment(entry.pmtId)}>
+                            <Glyphicon glyph="eye-close" title="hide payment" />
+                          </Button>
+                          ) : null }
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </Table>
                 <Tab.Container activeKey={this.state.paymentTabKey} onSelect={()=>{}} id="payment-tabs">
                   <Tab.Content>
                     <Tab.Pane eventKey="none" className="emptyTabPane">
-                      <i>Book balances exclude funds on open orders.</i>
                     </Tab.Pane>
                     <Tab.Pane eventKey="depositBase">
                       <p>
@@ -1081,9 +1231,7 @@ class App extends Component {
                             <FormControl type="text" value={this.state.depositBase.newApprovedAmount} onChange={this.handleDepositBaseNewApprovedAmountChange}/>
                             <InputGroup.Addon>{this.state.pairInfo.base.symbol}</InputGroup.Addon>
                           </InputGroup>
-                          <Button bsStyle="primary" onClick={this.handleDepositBaseSetApprovedAmountClick}>
-                            Set Approved Amount
-                          </Button>
+                          <SendingButton bsStyle="primary" onClick={this.handleDepositBaseSetApprovedAmountClick} text="Set Approved Amount" />
                           <FormControl.Feedback />
                         </FormGroup>
                         <FormGroup controlId="collection">
@@ -1091,9 +1239,7 @@ class App extends Component {
                           <HelpBlock>
                           Finally, you need to tell the book contract to receive the {this.state.pairInfo.base.symbol} tokens you approved:
                           </HelpBlock>
-                          <Button bsStyle="primary" onClick={this.handleDepositBaseCollectClick}>
-                            Collect approved {this.state.pairInfo.base.symbol}
-                          </Button>
+                          <SendingButton bsStyle="primary" onClick={this.handleDepositBaseCollectClick} text={'Collect Approved ' + this.state.pairInfo.base.symbol} />
                         </FormGroup>
                       </form>
                     </Tab.Pane>
@@ -1116,9 +1262,7 @@ class App extends Component {
                             <FormControl type="text" value={this.state.withdrawBase.amount} onChange={this.handleWithdrawBaseAmountChange}/>
                             <InputGroup.Addon>{this.state.pairInfo.base.symbol}</InputGroup.Addon>
                           </InputGroup>
-                          <Button bsStyle="warning" onClick={this.handleWithdrawBaseClick}>
-                            Withdraw {this.state.pairInfo.base.symbol}
-                          </Button>
+                          <SendingButton bsStyle="warning" onClick={this.handleWithdrawBaseClick} text={'Withdraw ' + this.state.pairInfo.base.symbol} />
                           <FormControl.Feedback />
                         </FormGroup>
                       </form>
@@ -1149,9 +1293,7 @@ class App extends Component {
                             <FormControl type="text" value={this.state.depositCntr.amount} onChange={this.handleDepositCntrAmountChange}/>
                             <InputGroup.Addon>{this.state.pairInfo.cntr.symbol}</InputGroup.Addon>
                           </InputGroup>
-                          <Button bsStyle="primary" onClick={this.handleDepositCntrClick}>
-                            Deposit {this.state.pairInfo.cntr.symbol}
-                          </Button>
+                          <SendingButton bsStyle="primary" onClick={this.handleDepositCntrClick} text={'Deposit ' + this.state.pairInfo.cntr.symbol} />
                           <FormControl.Feedback />
                           <HelpBlock>
                           Don't forget to leave some {this.state.pairInfo.cntr.symbol} in your account to pay for gas fees.
@@ -1178,9 +1320,7 @@ class App extends Component {
                             <FormControl type="text" value={this.state.withdrawCntr.amount} onChange={this.handleWithdrawCntrAmountChange}/>
                             <InputGroup.Addon>{this.state.pairInfo.cntr.symbol}</InputGroup.Addon>
                           </InputGroup>
-                          <Button bsStyle="warning" onClick={this.handleWithdrawCntrClick}>
-                            Withdraw {this.state.pairInfo.cntr.symbol}
-                          </Button>
+                          <SendingButton bsStyle="warning" onClick={this.handleWithdrawCntrClick} text={'Withdraw ' + this.state.pairInfo.cntr.symbol} />
                           <FormControl.Feedback />
                         </FormGroup>
                       </form>
@@ -1308,13 +1448,7 @@ class App extends Component {
                     </FormGroup>
                     <FormGroup>
                       <ButtonToolbar>
-                        <Button bsStyle="primary" onClick={this.handlePlaceBuyOrder} disabled={this.state.createOrder.buy.inProgress}>
-                          {(this.state.createOrder.buy.inProgress) ? (
-                            <span><Glyphicon glyph="send" /> Sending ...</span>
-                          ) : (
-                            <span>Place Buy Order</span>
-                          )}
-                        </Button>
+                        <SendingButton bsStyle="primary" onClick={this.handlePlaceBuyOrder} text="Place Buy Order" />
                       </ButtonToolbar>
                       <HelpBlock>
                         Please read our <a target="_blank" href="http://ubitok.io/trading-rules.html">Trading Rules</a> for help and terms.
@@ -1368,9 +1502,7 @@ class App extends Component {
                     </FormGroup>
                     <FormGroup>
                       <ButtonToolbar>
-                        <Button bsStyle="warning" onClick={this.handlePlaceSellOrder}>
-                          Place Sell Order
-                        </Button>
+                        <SendingButton bsStyle="warning" onClick={this.handlePlaceSellOrder} text="Place Sell Order" />
                       </ButtonToolbar>
                       <HelpBlock>
                         Please read our <a target="_blank" href="http://ubitok.io/trading-rules.html">Trading Rules</a> for help and terms.
@@ -1399,10 +1531,10 @@ class App extends Component {
                         <td className={this.chooseClassNameForPrice(entry.price)}>{entry.price}</td>
                         <td>{entry.sizeBase}</td>
                         <td>
-                          { (entry.status === 'Sending') ? (
+                          { (entry.status === 'Sending' || entry.modifyInProgress !== undefined) ? (
                           <Spinner name="line-scale" color="purple"/>
                           ) : undefined }
-                          {entry.status}
+                          {entry.status + ((entry.modifyInProgress !== undefined) ? ' (' + entry.modifyInProgress + ')' : '')}
                         </td>
                         <td>{this.formatBase(entry.rawExecutedBase)}</td>
                         <td>
@@ -1451,7 +1583,10 @@ class App extends Component {
                           </tr>
                           <tr>
                             <td>Transaction</td>
-                            <td>&nbsp;</td>
+                            <td>
+                              <EthTxnLink txnHash={this.state.myOrders[this.state.orderInfoOrderId].txnHash} 
+                                 networkName={this.state.bridgeStatus.chosenSupportedNetworkName} large={true} />
+                            </td>
                           </tr>
                           <tr>
                             <td>Price</td>
