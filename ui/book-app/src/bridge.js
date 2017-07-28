@@ -53,6 +53,7 @@ class Bridge {
     this.statusSubscribers = [];
     this.baseDecimals = 18;
     this.cntrDecimals = 18;
+    this.startedConnectingAt = new Date();
     window.setTimeout(this.pollStatus, 1000);
   }
 
@@ -66,7 +67,8 @@ class Bridge {
       accountLocked: false,
       accountChanged: false,
       canMakePublicCalls: false,
-      canMakeAccountCalls: false
+      canMakeAccountCalls: false,
+      withinGracePeriod: true
     };
   }
 
@@ -121,7 +123,8 @@ class Bridge {
       accountLocked: accountLocked,
       accountChanged: accountChanged,
       canMakePublicCalls: canMakePublicCalls,
-      canMakeAccountCalls: canMakePublicCalls && !accountLocked && !accountChanged
+      canMakeAccountCalls: canMakePublicCalls && !accountLocked && !accountChanged,
+      withinGracePeriod: (new Date() - this.startedConnectingAt) < 5000
     };
   }
 

@@ -9,11 +9,12 @@ import update from 'immutability-helper';
 import Spinner from 'react-spinkit';
 
 import logo from './ubitok-logo.svg';
-import metamaskLogo from './metamask.png';
-import mistLogo from './mist.png';
 
+import BridgeStatus from './bridge-status.js';
+import CreateOrder from './create-order.js';
 import SendingButton from './sending-button.js';
 import EthTxnLink from './eth-txn-link.js';
+import OrderDetails from './order-details.js';
 
 import './App.css';
 
@@ -133,24 +134,9 @@ class App extends Component {
         "bids": []
       },
 
-      // orders the user is preparing to place
+      // is the user on the Buying or Selling tab?
 
-      "createOrder": {
-        // have they selected buy or sell base?
-        "side": "buy",
-        "buy": {
-          "amountBase": "",
-          "price": "",
-          "costCntr": "",
-          "terms": "GTCNoGasTopup"
-        },
-        "sell": {
-          "amountBase": "",
-          "price": "",
-          "returnCntr": "",
-          "terms": "GTCNoGasTopup"
-        }
-      },
+      "createOrderDirection": "Buy",
 
       // Orders the client has created.
       // (keyed by orderId, which sorting as a string corresponds to sorting by client-claimed-creation-time)
@@ -306,6 +292,7 @@ class App extends Component {
     });
   }
 
+  // TODO - move to some sort of helper?
   readPublicData = () => {
     this.bridge.subscribeFutureMarketEvents(this.handleMarketEvent);
     this.startWalkBook();
@@ -516,236 +503,15 @@ class App extends Component {
     // TODO - load different page?
   }
 
-  // TODO - totally wrong
-  getValidationState = () => {
-    const length = this.state.createOrder.buy.amountBase.length;
-    if (length > 10) return 'success';
-    else if (length > 5) return 'warning';
-    else if (length > 0) return 'error';
-  }
-
-  // TODO - move some of this logic to UbiTokTypes?
-  getCreateOrderAmountValidationResult = (direction) => {
-    let directionKey = direction.toLowerCase();
-    let amount = this.state.createOrder[directionKey].amountBase;
-    let terms = this.state.createOrder[directionKey].terms;
-    if (amount === undefined || amount.trim() === '') {
-      return ['error', 'Amount is blank'];
-    }
-    let number = new BigNumber(NaN);
-    try {
-      number = new BigNumber(amount);
-    } catch (e) {
-    }
-    if (number.isNaN() || !number.isFinite()) {
-      return ['error', 'Amount does not look like a regular number'];
-    }
-    let rawAmountBase = UbiTokTypes.encodeBaseAmount(amount);
-    let minInitialSize = this.state.pairInfo.base.minInitialSize;
-    if (rawAmountBase.lt(UbiTokTypes.encodeBaseAmount(minInitialSize))) {
-      return ['error', 'Amount is too small, must be at least ' + minInitialSize];
-    }
-    if (rawAmountBase.gte('1e32')) {
-      return ['error', 'Amount is too large'];
-    }
-    if (direction === 'Sell') {
-      let availableBalance = this.state.balances.exchange[0];
-      if (availableBalance !== undefined && 
-          rawAmountBase.gt(UbiTokTypes.encodeBaseAmount(availableBalance))) {
-        return ['error', 'Your Book Contract ' + this.state.pairInfo.base.symbol +
-          ' balance is too low, try a smaller amount or deposit more funds'];
-      }
-    }
-    let helpMsg = undefined;
-    if (direction === 'Buy' && terms !== 'MakerOnly') {
-      let rawFees = rawAmountBase.times('0.0005');
-      helpMsg = 'A fee of up to ' + UbiTokTypes.decodeBaseAmount(rawFees) + ' ' + this.state.pairInfo.base.symbol + ' may be deducted';
-    }
-    return ['success', helpMsg];
-  }
-
-  getCreateOrderPriceValidationResult = (direction) => {
-    let directionKey = direction.toLowerCase();
-    let pricePart = this.state.createOrder[directionKey].price;
-    let errorAndResult = UbiTokTypes.parseFriendlyPricePart(direction, pricePart);
-    if (errorAndResult[0]) {
-      let error = errorAndResult[0];
-      let helpMsg = 'Price ' + error.msg;
-      if (error.suggestion) {
-        helpMsg += '. Perhaps try ' + error.suggestion + '?';
-      }
-      return ['error', helpMsg];
-    }
-    return ['success', undefined];
-  }
-
-  getCreateOrderCostValidationResult = () => {
-    let direction = 'Buy';
-    let directionKey = direction.toLowerCase();
-    let amount = this.state.createOrder[directionKey].amountBase;
-    let pricePart = this.state.createOrder[directionKey].price;
-    let cost = new BigNumber(NaN);
-    try {
-      cost = (new BigNumber(amount)).times(new BigNumber(pricePart));
-    } catch (e) {
-    }
-    if (cost.isNaN()) {
-      return [null, undefined, 'N/A'];
-    }
-    let displayedCost = cost.toFixed();
-    let rawCost = UbiTokTypes.encodeCntrAmount(cost);
-    let minInitialSize = this.state.pairInfo.cntr.minInitialSize;
-    if (rawCost.lt(UbiTokTypes.encodeCntrAmount(minInitialSize))) {
-      return ['error', 'Cost is too small (must be at least ' + minInitialSize + '), try a larger amount', displayedCost];
-    }
-    if (rawCost.gte('1e32')) {
-      return ['error', 'Cost is too large, try a smaller amount'];
-    }
-    let availableBalance = this.state.balances.exchange[1];
-    if (availableBalance !== undefined &&
-        rawCost.gt(UbiTokTypes.encodeCntrAmount(availableBalance))) {
-      return ['error', 'Your Book Contract ' + this.state.pairInfo.cntr.symbol +
-        ' balance is too low, try a smaller amount or deposit more funds' +
-        ' (remember to leave a little in your account for gas)', displayedCost];
-    }
-    return ['success', undefined, displayedCost];
-  }
-
-  getCreateOrderProceedsValidationResult = () => {
-    let direction = 'Sell';
-    let directionKey = direction.toLowerCase();
-    let amount = this.state.createOrder[directionKey].amountBase;
-    let pricePart = this.state.createOrder[directionKey].price;
-    let terms = this.state.createOrder[directionKey].terms;
-    let proceeds = new BigNumber(NaN);
-    try {
-      proceeds = (new BigNumber(amount)).times(new BigNumber(pricePart));
-    } catch (e) {
-    }
-    if (proceeds.isNaN()) {
-      return [null, undefined, 'N/A'];
-    }
-    let displayedProceeds = proceeds.toFixed();
-    let rawProceeds = UbiTokTypes.encodeCntrAmount(proceeds);
-    let minInitialSize = this.state.pairInfo.cntr.minInitialSize;
-    if (rawProceeds.lt(UbiTokTypes.encodeCntrAmount(minInitialSize))) {
-      return ['error', 'Proceeds are too small (must be at least ' + minInitialSize + '), try a larger amount', displayedProceeds];
-    }
-    if (rawProceeds.gte('1e32')) {
-      return ['error', 'Proceeds are too large, try a smaller amount'];
-    }
-    let helpMsg = undefined;
-    if (terms !== 'MakerOnly') {
-      let rawFees = rawProceeds.times('0.0005');
-      helpMsg = 'A fee of up to ' + UbiTokTypes.decodeCntrAmount(rawFees) + ' ' + this.state.pairInfo.cntr.symbol + ' may be deducted';
-    }
-    return ['success', helpMsg, displayedProceeds];
-  }
-  
-  getCreateOrderTermsValidationResult = (direction) => {
-    let directionKey = direction.toLowerCase();
-    let amount = this.state.createOrder[directionKey].amountBase;
-    let pricePart = this.state.createOrder[directionKey].price;
-    let terms = this.state.createOrder[directionKey].terms;
-    // TODO - check if e.g. maker only will take, or others will have crazee number of matches?
-    return ['success', undefined];
-  }
-  
-  handleCreateOrderSideSelect = (e) => {
-    var v = e; // no event object for this one?
+  handleCreateOrderDirectionSelect = (key) => {
     this.setState((prevState, props) => {
       return {
-        createOrder: update(prevState.createOrder, {
-          side: {$set: v},
-        })
-      }
-    });
-  }
-
-  handleCreateOrderBuyAmountBaseChange = (e) => {
-    var v = e.target.value;
-    this.setState((prevState, props) => {
-      return {
-        createOrder: update(prevState.createOrder, {
-          buy: { amountBase: { $set: v } }
-        })
+        createOrderDirection: key
       };
     });
   }
 
-  handleCreateOrderSellAmountBaseChange = (e) => {
-    var v = e.target.value;
-    this.setState((prevState, props) => {
-      return {
-        createOrder: update(prevState.createOrder, {
-          sell: { amountBase: { $set: v } }
-        })
-      };
-    });
-  }
-
-  handleCreateOrderBuyPriceChange = (e) => {
-    var v = e.target.value;
-    this.setState((prevState, props) => {
-      return {
-        createOrder: update(prevState.createOrder, {
-          buy: { price: { $set: v } }
-        })
-      };
-    });
-  }
-
-  handleCreateOrderSellPriceChange = (e) => {
-    var v = e.target.value;
-    this.setState((prevState, props) => {
-      return {
-        createOrder: update(prevState.createOrder, {
-          sell: { price: { $set: v } }
-        })
-      };
-    });
-  }
-
-  handleCreateOrderBuyTermsChange = (e) => {
-    var v = e.target.value;
-    this.setState((prevState, props) => {
-      return {
-        createOrder: update(prevState.createOrder, {
-          buy: { terms: { $set: v } }
-        })
-      };
-    });
-  }
-  
-  handleCreateOrderSellTermsChange = (e) => {
-    var v = e.target.value;
-    this.setState((prevState, props) => {
-      return {
-        createOrder: update(prevState.createOrder, {
-          sell: { terms: { $set: v } }
-        })
-      };
-    });
-  }
-  
-  handlePlaceBuyOrder = (e) => {
-    var orderId = UbiTokTypes.generateDecodedOrderId();
-    var price = "Buy @ " + this.state.createOrder.buy.price;
-    var sizeBase = this.state.createOrder.buy.amountBase;
-    var terms = this.state.createOrder.buy.terms;
-    let callback = (error, result) => {
-      this.handlePlaceOrderCallback(orderId, error, result);
-    };
-    this.bridge.submitCreateOrder(orderId, price, sizeBase, terms, callback);
-    var newOrder = this.fillInSendingOrder(orderId, price, sizeBase, terms);
-    this.createMyOrder(newOrder);
-  }
-
-  handlePlaceSellOrder = (e) => {
-    var orderId = UbiTokTypes.generateDecodedOrderId();
-    var price = "Sell @ " + this.state.createOrder.sell.price;
-    var sizeBase = this.state.createOrder.sell.amountBase;
-    var terms = this.state.createOrder.sell.terms;
+  handlePlaceOrder = (orderId, price, sizeBase, terms) => {
     let callback = (error, result) => {
       this.handlePlaceOrderCallback(orderId, error, result);
     };
@@ -1040,58 +806,7 @@ class App extends Component {
             </Row>
             <Row>
               <Col md={12}>
-                {!this.state.bridgeStatus.web3Present ? (
-                <Panel header="No Ethereum Connection" bsStyle="danger">
-                  <p>UbiTok.io needs to connect to the Ethereum network via a local client, but could not find one.</p>
-                  <p>We suggest using one of the following clients to connect to Ethereum:</p>
-                  <Row>
-                      <Col sm={6}>
-                          <a href="https://metamask.io/" target="_blank">
-                            <h4>Metamask Chrome Extension</h4>
-                            <img src={metamaskLogo} className="Metamask-logo" alt="Metamask" />
-                          </a>
-                      </Col>
-                      <Col sm={6}>
-                          <a href="https://github.com/ethereum/mist/releases" target="_blank">
-                            <h4>Mist Browser</h4>
-                            <img src={mistLogo} className="Mist-logo" alt="Mist" />
-                          </a>
-                      </Col>
-                  </Row>
-                </Panel>
-                ) : this.state.bridgeStatus.unsupportedNetwork ? (
-                <Panel header="Unsupported Ethereum Network" bsStyle="danger">
-                  <p>UbiTok.io is currently only available on the Ropsten Test Network.</p>
-                  <p>Try changing Ethereum Network in your Ethereum Client (e.g. Metamask, Mist).</p>
-                </Panel>
-                ) : this.state.bridgeStatus.networkChanged ? (
-                <Panel header="Ethereum Network Changed" bsStyle="danger">
-                  <p>You seem to have changed Ethereum Network.</p>
-                  <p>Try changing Ethereum Network in your Ethereum Client (e.g. Metamask, Mist)
-                     back to {this.state.bridgeStatus.chosenSupportedNetworkName}, or reload this page to pick up the new network.</p>
-                </Panel>
-                ) : this.state.bridgeStatus.accountLocked ? (
-                <Panel header="Ethereum Account Locked" bsStyle="danger">
-                  <p>UbiTok.io needs to know which Ethereum account to use.</p>
-                  <p>Try unlocking your Ethereum Client (e.g. Metamask, Mist).</p>
-                </Panel>
-                ) : this.state.bridgeStatus.accountChanged ? (
-                <Panel header="Ethereum Account Changed" bsStyle="danger">
-                  <p>You seem to have changed Ethereum Account.</p>
-                  <p>Try changing Ethereum Account in your Ethereum Client (e.g. Metamask, Mist)
-                     back to {this.state.bridgeStatus.chosenAccount}, or reload this page to pick up the new account.</p>
-                </Panel>
-                ) : (!this.state.bridgeStatus.canMakePublicCalls || !this.state.bridgeStatus.canMakeAccountCalls) ? (
-                <Panel header="Unknown Ethereum Connection Problem" bsStyle="danger">
-                  <p>Some unusual problem has occurred preventing UbiTok.io connecting to the Ethereum Network.</p>
-                  <p>Try reloading this page, or contact help@ubitok.io with details of the problem.</p>
-                </Panel>
-                ) : (
-                <Well bsSize="small">
-                  <Glyphicon glyph="info-sign" title="Ethereum Connection Info" />
-                  &nbsp;Using Ethereum Account {this.state.bridgeStatus.chosenAccount} on {this.state.bridgeStatus.chosenSupportedNetworkName} via a local client.
-                </Well>
-                )}
+                <BridgeStatus bridgeStatus={this.state.bridgeStatus} />
               </Col>
             </Row>
             <Row>
@@ -1369,10 +1084,6 @@ class App extends Component {
                   </Table>
               </Col>
               <Col md={4}>
-                {/*
-                <h3>Price History</h3>
-                <img src={mockPriceChart} alt="insufficient data for a meaningful price chart" />
-                */}
                 <h3>Market Trades</h3>
                   <Table striped bordered condensed hover>
                     <thead>
@@ -1400,114 +1111,13 @@ class App extends Component {
             <Row>
               <Col md={4}>
                 <h3>Create Order</h3>
-                <Tabs activeKey={this.state.createOrder.side} onSelect={this.handleCreateOrderSideSelect} id="create-order-side">
-                  <Tab eventKey="buy" title={"BUY " + this.state.pairInfo.base.symbol}>
-                    <FormGroup controlId="createOrderBuyAmount" validationState={this.getCreateOrderAmountValidationResult('Buy')[0]}>
-                      <InputGroup>
-                        <InputGroup.Addon>Amount</InputGroup.Addon>
-                        <FormControl
-                          type="text"
-                          value={this.state.createOrder.buy.amountBase}
-                          placeholder={"How many " + this.state.pairInfo.base.symbol + " to buy"}
-                          onChange={this.handleCreateOrderBuyAmountBaseChange}
-                        />
-                        <InputGroup.Addon>{this.state.pairInfo.base.symbol}</InputGroup.Addon>
-                      </InputGroup>
-                      <HelpBlock>{this.getCreateOrderAmountValidationResult('Buy')[1]}</HelpBlock>
-                    </FormGroup>
-                    <FormGroup controlId="createOrderBuyPrice" validationState={this.getCreateOrderPriceValidationResult('Buy')[0]}>
-                      <InputGroup>
-                        <InputGroup.Addon>Price</InputGroup.Addon>
-                        <InputGroup.Addon>Buy @ </InputGroup.Addon>
-                        <FormControl
-                          type="text"
-                          value={this.state.createOrder.buy.price}
-                          placeholder={"How many " + this.state.pairInfo.cntr.symbol + " per " + this.state.pairInfo.base.symbol}
-                          onChange={this.handleCreateOrderBuyPriceChange}
-                        />
-                      </InputGroup>
-                      <HelpBlock>{this.getCreateOrderPriceValidationResult('Buy')[1]}</HelpBlock>
-                    </FormGroup>
-                    <FormGroup controlId="createOrderBuyCost" validationState={this.getCreateOrderCostValidationResult()[0]}>
-                      <InputGroup>
-                        <InputGroup.Addon>Cost</InputGroup.Addon>
-                        <FormControl type="text" value={this.getCreateOrderCostValidationResult()[2]} readOnly onChange={()=>{}}/>
-                        <InputGroup.Addon>{this.state.pairInfo.cntr.symbol}</InputGroup.Addon>
-                      </InputGroup>
-                      <HelpBlock>{this.getCreateOrderCostValidationResult()[1]}</HelpBlock>
-                    </FormGroup>
-                    <FormGroup controlId="createOrderBuyTerms" validationState={this.getCreateOrderTermsValidationResult('Buy')[0]}>
-                      <ControlLabel>Terms</ControlLabel>
-                      <FormControl componentClass="select" value={this.state.createOrder.buy.terms} onChange={this.handleCreateOrderBuyTermsChange}>
-                        <option value="GTCNoGasTopup">Good Till Cancel (no gas topup)</option>
-                        <option value="GTCWithGasTopup">Good Till Cancel (gas topup enabled)</option>
-                        <option value="ImmediateOrCancel">Immediate Or Cancel</option>
-                        <option value="MakerOnly">Maker Only</option>
-                      </FormControl>
-                      <HelpBlock>{this.getCreateOrderTermsValidationResult('Buy')[1]}</HelpBlock>
-                    </FormGroup>
-                    <FormGroup>
-                      <ButtonToolbar>
-                        <SendingButton bsStyle="primary" onClick={this.handlePlaceBuyOrder} text="Place Buy Order" />
-                      </ButtonToolbar>
-                      <HelpBlock>
-                        Please read our <a target="_blank" href="http://ubitok.io/trading-rules.html">Trading Rules</a> for help and terms.
-                      </HelpBlock>
-                    </FormGroup>
+                {/* need tabs inline here - https://github.com/react-bootstrap/react-bootstrap/issues/1936 */}
+                <Tabs activeKey={this.state.createOrderDirection} onSelect={this.handleCreateOrderDirectionSelect} id="create-order-direction">
+                  <Tab eventKey="Buy" title={'BUY' + ' ' + this.state.pairInfo.base.symbol}>
+                    <CreateOrder direction="Buy" pairInfo={this.state.pairInfo} balances={this.state.balances} onPlace={this.handlePlaceOrder} />
                   </Tab>
-                  <Tab eventKey={"sell"} title={"SELL " + this.state.pairInfo.base.symbol}>
-                    <FormGroup controlId="createOrderSellAmount" validationState={this.getCreateOrderAmountValidationResult('Sell')[0]}>
-                      <InputGroup>
-                        <InputGroup.Addon>Amount</InputGroup.Addon>
-                        <FormControl
-                          type="text"
-                          value={this.state.createOrder.sell.amountBase}
-                          placeholder={"How many " + this.state.pairInfo.base.symbol + " to sell"}
-                          onChange={this.handleCreateOrderSellAmountBaseChange}
-                        />
-                        <InputGroup.Addon>{this.state.pairInfo.base.symbol}</InputGroup.Addon>
-                      </InputGroup>
-                      <HelpBlock>{this.getCreateOrderAmountValidationResult('Sell')[1]}</HelpBlock>
-                    </FormGroup>
-                    <FormGroup controlId="createOrderSellPrice" validationState={this.getCreateOrderPriceValidationResult('Sell')[0]}>
-                      <InputGroup>
-                        <InputGroup.Addon>Price</InputGroup.Addon>
-                        <InputGroup.Addon>Sell @ </InputGroup.Addon>
-                        <FormControl
-                          type="text"
-                          value={this.state.createOrder.sell.price}
-                          placeholder={"How many " + this.state.pairInfo.cntr.symbol + " per " + this.state.pairInfo.base.symbol}
-                          onChange={this.handleCreateOrderSellPriceChange}
-                        />
-                      </InputGroup>
-                      <HelpBlock>{this.getCreateOrderPriceValidationResult('Sell')[1]}</HelpBlock>
-                    </FormGroup>
-                    <FormGroup controlId="createOrderSellProceeds" validationState={this.getCreateOrderProceedsValidationResult()[0]}>
-                      <InputGroup>
-                        <InputGroup.Addon>Proceeds</InputGroup.Addon>
-                        <FormControl type="text" value={this.getCreateOrderProceedsValidationResult()[2]} readOnly onChange={()=>{}}/>
-                        <InputGroup.Addon>{this.state.pairInfo.cntr.symbol}</InputGroup.Addon>
-                      </InputGroup>
-                      <HelpBlock>{this.getCreateOrderProceedsValidationResult()[1]}</HelpBlock>
-                    </FormGroup>
-                    <FormGroup controlId="createOrderSellTerms" validationState={this.getCreateOrderTermsValidationResult('Sell')[0]}>
-                      <ControlLabel>Terms</ControlLabel>
-                      <FormControl componentClass="select" value={this.state.createOrder.sell.terms} onChange={this.handleCreateOrderSellTermsChange}>
-                        <option value="GTCNoGasTopup">Good Till Cancel (no gas topup)</option>
-                        <option value="GTCWithGasTopup">Good Till Cancel (gas topup enabled)</option>
-                        <option value="ImmediateOrCancel">Immediate Or Cancel</option>
-                        <option value="MakerOnly">Maker Only</option>
-                      </FormControl>
-                      <HelpBlock>{this.getCreateOrderTermsValidationResult('Sell')[1]}</HelpBlock>
-                    </FormGroup>
-                    <FormGroup>
-                      <ButtonToolbar>
-                        <SendingButton bsStyle="warning" onClick={this.handlePlaceSellOrder} text="Place Sell Order" />
-                      </ButtonToolbar>
-                      <HelpBlock>
-                        Please read our <a target="_blank" href="http://ubitok.io/trading-rules.html">Trading Rules</a> for help and terms.
-                      </HelpBlock>
-                    </FormGroup>
+                  <Tab eventKey="Sell" title={'SELL' + ' ' + this.state.pairInfo.base.symbol}>
+                    <CreateOrder direction="Sell" pairInfo={this.state.pairInfo} balances={this.state.balances} onPlace={this.handlePlaceOrder} />
                   </Tab>
                 </Tabs>
               </Col>
@@ -1563,81 +1173,13 @@ class App extends Component {
                       )}
                     </tbody>
                   </Table>
-
-                  <Modal show={this.state.showOrderInfo} onHide={this.handleOrderInfoCloseClick}>
-                    <Modal.Header closeButton>
-                      <Modal.Title>Order Details</Modal.Title>
-                    </Modal.Header>
-                    { (!this.state.orderInfoOrderId) ? (<Modal.Body>No order selected.</Modal.Body>) : (
-                    <Modal.Body>
-
-                      <Table striped bordered condensed hover>
-                        <tbody>
-                          <tr>
-                            <td>Order Id</td>
-                            <td>{this.state.orderInfoOrderId}</td>
-                          </tr>
-                          <tr>
-                            <td>Created At</td>
-                            <td>{this.formatCreationDateOf(this.state.orderInfoOrderId)}</td>
-                          </tr>
-                          <tr>
-                            <td>Transaction</td>
-                            <td>
-                              <EthTxnLink txnHash={this.state.myOrders[this.state.orderInfoOrderId].txnHash} 
-                                 networkName={this.state.bridgeStatus.chosenSupportedNetworkName} large={true} />
-                            </td>
-                          </tr>
-                          <tr>
-                            <td>Price</td>
-                            <td className={this.chooseClassNameForPrice(this.state.myOrders[this.state.orderInfoOrderId].price)}>
-                              {this.state.myOrders[this.state.orderInfoOrderId].price}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td>Original Size ({this.state.pairInfo.base.symbol})</td>
-                            <td>{this.state.myOrders[this.state.orderInfoOrderId].sizeBase}</td>
-                          </tr>
-                          <tr>
-                            <td>Terms</td>
-                            <td>{this.state.myOrders[this.state.orderInfoOrderId].terms}</td>
-                          </tr>
-                          <tr>
-                            <td>Filled ({this.state.pairInfo.base.symbol})</td>
-                            <td>{this.formatBase(this.state.myOrders[this.state.orderInfoOrderId].rawExecutedBase)}</td>
-                          </tr>
-                          <tr>
-                            <td>Filled ({this.state.pairInfo.cntr.symbol})</td>
-                            <td>{this.formatCntr(this.state.myOrders[this.state.orderInfoOrderId].rawExecutedCntr)}</td>
-                          </tr>
-                          { (this.state.myOrders[this.state.orderInfoOrderId].price.startsWith('Buy')) ? (
-                          <tr>
-                            <td>Fees ({this.state.pairInfo.base.symbol})</td>
-                            <td>{this.formatCntr(this.state.myOrders[this.state.orderInfoOrderId].rawFees)}</td>
-                          </tr>
-                          ) : (
-                          <tr>
-                            <td>Fees ({this.state.pairInfo.cntr.symbol})</td>
-                            <td>{this.formatCntr(this.state.myOrders[this.state.orderInfoOrderId].rawFees)}</td>
-                          </tr>
-                          ) }
-                          <tr>
-                            <td>Status</td>
-                            <td>{this.state.myOrders[this.state.orderInfoOrderId].status}</td>
-                          </tr>
-                          <tr>
-                            <td>Reason Code</td>
-                            <td>{this.state.myOrders[this.state.orderInfoOrderId].reasonCode}</td>
-                          </tr>
-                        </tbody>
-                      </Table>
-                    </Modal.Body>
-                    )}
-                    <Modal.Footer>
-                      <Button onClick={this.handleOrderInfoCloseClick}>Close</Button>
-                    </Modal.Footer>
-                  </Modal>
-                  
+                  <OrderDetails
+                    show={this.state.showOrderInfo}
+                    onClose={this.handleOrderInfoCloseClick}
+                    myOrder={this.state.myOrders[this.state.orderInfoOrderId]} 
+                    pairInfo={this.state.pairInfo}
+                    chosenSupportedNetworkName={this.state.bridgeStatus.chosenSupportedNetworkName}
+                    clock={this.state.clock} />
               </Col>
             </Row>
           </Grid>
