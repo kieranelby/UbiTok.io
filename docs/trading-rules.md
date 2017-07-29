@@ -88,15 +88,15 @@ Orders in some Statuses (such as Rejected and Done) have a further Reason Code e
 
 ### New Book Formation
 
-From time to time, UbiTok.io may release a new exchange contract for a trading pair and make the UbiTok.io web UI point to the new contract. For example, we might do this to improve performance, add features, or adjust minimum order sizes. 
+From time to time, UbiTok.io's software suppliers may release a new exchange contract for a trading pair and make the UbiTok.io web UI point to the new contract. For example, we might do this to improve performance, add features, or adjust minimum order sizes. 
 
-When this happens, orders from the old contract will not be copied to the new contract - the new book will start empty. UbiTok.io will try to provide several days notice before introducing a new contract, though exceptions may be made for security issues.
+When this happens, orders from the old contract will not be copied to the new contract - the new book will start empty. UbiTok.io's software suppliers will try to provide several days notice before introducing a new contract, though exceptions may be made for security issues.
  
-UbiTok.io aims to provide easy web UI access to each old contract for at least 3 months so orders / balances in the old contract can be cancelled, withdrawn or inspected. The contract itself is unstoppable - clients can continue to use the old contract via other interfaces.
+We aim to provide easy web UI access to each old contract for at least 3 months so orders / balances in the old contract can be cancelled, withdrawn or inspected. The contract itself is unstoppable - clients can continue to use the old contract via other interfaces.
 
 ### Other Market Participants
 
-The exchange contract has no notion of sign-up, approval, or indeed identity. UbiTok.io cannot and does not intend to police behaviour of clients of the exchange contract.
+The UbiTok.io exchange contract has no notion of sign-up, approval, or indeed identity. UbiTok.io's software suppliers cannot and do not intend to police behaviour of clients of the exchange contract.
 
 However, we ask that clients:
 - act honestly in dealings other market participants;
@@ -106,16 +106,16 @@ However, we ask that clients:
 
 ### Terms and Conditions
 
-The UbiTok.io Dapp (the Solidity Contracts and Web UI) is provided "as is", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose and noninfringement.
+The UbiTok.io Solidity Contracts, Web UI, and software libraries ("the Dapp") are provided "as is", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose and noninfringement.
 
-In no event shall the authors or copyright holders be liable for any claim, damages or other liability, whether in an action of contract, tort or otherwise, arising from, out of or in connection with the Dapp or the use or other dealings in the Dapp.
-
-The Dapp contracts will live as long as the Ethereum blockchain, but no warranty is given that the UbiTok.io website will continue to provide access to the contracts.
+In no event shall the authors or copyright holders ("the software suppliers") be liable for any claim, damages or other liability, whether in an action of contract, tort or otherwise, arising from, out of or in connection with the Dapp or the use or other dealings in the Dapp.
 
 The Dapp should be considered its own autonomous entity as far as permitted by law - it is your responsiblity to study its likely behaviour before interacting with it, including taking into account that the actual behaviour of the compiled contract in a real Ethereum node may differ from the assumed behaviour based on the apparent intent of the Solidity source code, or differ from the trading rules in this page.
 
-UbiTok.io are unable to and will not cancel, undo, or make good any erroneous trades - all trades are final, even in the case of palpable errors made by market participants or UbiTok.io themselves. UbiTok.io is not responsible for the behaviour of other market participants.
+The Dapp contracts will live as long as the Ethereum blockchain, but no warranty is given that the UbiTok.io website will continue to provide access to the contracts.
 
-UbiTok.io do not in any way endorse the suitability of tokens offered for sale on the exchange. Nothing on this website should be taken as financial advice.
+The software suppliers are unable to and will not cancel, undo, or make good any erroneous trades - all trades are final, even in the case of palpable errors made by market participants or the software suppliers themselves. The software suppliers are not responsible for the behaviour of other market participants.
+
+The software suppliers do not in any way endorse the suitability of tokens offered for sale on the exchange. Nothing on this website should be taken as financial advice.
 
 By interacting with the Dapp you agree to accept the conditions in this section as well as those listed at ethereum.org/agreement.

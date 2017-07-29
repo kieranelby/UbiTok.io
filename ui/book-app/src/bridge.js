@@ -86,7 +86,17 @@ class Bridge {
       this.web3 = new Web3(window.web3.currentProvider);
     }
     let web3Present = this.web3 !== undefined && this.web3.hasOwnProperty("version");
-    let networkId = web3Present ? this.web3.version.network : undefined;
+    let networkId = undefined;
+    try {
+      networkId = web3Present ? this.web3.version.network : undefined;
+    } catch (e) {
+      // in some web3 versions this seems to throw when the page is being closed?
+      // treat as web3 not available yet?
+      console.log('problem using web3', e);
+    }
+    if (networkId === undefined) {
+      web3Present = false;
+    }
     let unsupportedNetwork = web3Present && !this.supportedNetworks.hasOwnProperty(networkId);
     if (web3Present && this.chosenSupportedNetworkId === undefined && !unsupportedNetwork) {
       console.log('choosing network', networkId);

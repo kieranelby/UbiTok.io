@@ -74,14 +74,14 @@ class App extends Component {
       },
 
       // how much money do we have where?
-      // all are pairs of [ base, counter ] where "" = unknown
+      // all are pairs of [ base, counter ] where undefined = unknown
 
       "balances": {
-        "wallet": ["", ""],
+        "wallet": [undefined, undefined],
         // e.g. if we have approved some of our ERC20 funds for the contract
         // but not told the contract to transfer them to itself yet (fiddly!)
-        "approved": ["", ""],
-        "exchange": ["", ""]
+        "approved": [undefined, undefined],
+        "exchange": [undefined, undefined]
       },
 
       // which payment tab the user is on
@@ -185,6 +185,7 @@ class App extends Component {
     window.setInterval(this.pollExchangeBalances, 3000);
     window.setInterval(this.updateClock, 1000);
     window.setInterval(this.purgeExcessData, 5000);
+    window.document.title = 'UbiTok.io - ' + this.state.pairInfo.symbol;
   }
 
   panic = (msg) => {

@@ -1,14 +1,11 @@
-# UbiTok.io
-an unstoppable exchange for trading Ethereum tokens
-
-UbiTok.io runs entirely on the blockchain, which for clients means:
+The UbiTok.io exchange runs entirely on the blockchain, which for clients means:
 - no limits, no sign-up, no waiting for support to verify you;
 - it cannot be shutdown by regulators - or even by its creators;
 - you don't need to trust the exchange employees to look after your coins;
 - ultra-low exchange fees (plus a little gas to power the Ethereum blockchain);
 - total fairness: no preferential treatment for "special" clients.
 
-We aim to be the leading venue for trading Ethereum assets on-chain, and to help grow an ecosystem of smart contracts trading with each other (and with you).
+UbiTok.io aims to be the leading venue for trading Ethereum assets on-chain, and to help grow an ecosystem of smart contracts trading with each other (and with you).
 
 ## See UbiTok.io in Action
 Beta release coming soon ...
@@ -30,26 +27,26 @@ As well as tokens backed by assets, including:
 - BNT (Bancor), VERI - smart reserves
 
 ## How does UbiTok.io compare to other decentralized exchanges?
-As far as we know, UbiTok.io is the first decentralized exchange to meet the following three tests:
- - our clients don't need to install any special P2P software;
- - we don't use an off-chain matching engine so we have no servers to shut down or be hacked;
- - we offer a [full limit order book](./trading-rules.md), giving clients the best possible price and the exchange features you expect.
+UbiTok.io is the first decentralized exchange to meet the following three tests:
+ - clients don't need to install any special P2P software;
+ - no off-chain matching engine so no servers to shut down or be hacked;
+ - offers a [full limit order book](./trading-rules.md), giving clients the best possible price and the exchange features you expect.
 
 ## Who's behind UbiTok.io?
-Our founder and principal technologist has a background in algorithmic trading systems. He previously spent over a decade building secure, high volume gambling sites for leading bookmakers. He first dabbled in bitcoin in 2013 before flipping to Ethereum in 2015.
+UbiTok.io's founder and principal technologist, Kieran Elby, has a background in algorithmic trading systems. He previously spent over a decade building secure, high volume gambling sites for leading bookmakers. He first dabbled in bitcoin in 2013 before flipping to Ethereum in 2015.
 
 We're interested in growing our team in the near future - contact opportunities@ubitok.io.
 
 ## Are there downsides to being 100% on-chain?
-Yes - transaction times are much slower than a centralised exchange. This is hard to avoid - we need 1000s of Ethereum nodes worldwide to agree on the state of the orderbook (without trusting each other). You won't find High Frequency Traders on UbiTok.io - not necessarily a bad thing for everyone else! We've also had to reduce the number of price levels offered to allow us to perform best execution on-chain - so you'll see prices like 1.23, not 1.2298502.
+Yes - transaction times are much slower than a centralised exchange. This is hard to avoid - 1000s of Ethereum nodes worldwide need to agree on the state of the orderbook (without trusting each other). You won't find High Frequency Traders on UbiTok.io - not necessarily a bad thing for everyone else! We've also had to reduce the number of price levels offered to allow us to perform best execution on-chain - so you'll see prices like 1.23, not 1.2298502.
 
-## OK, but how do I withdraw cash from your exchange?
-We're not planning to interface with the traditional banking system, so if you need cash in your bank account, you'll need to use a third-party to turn your Ethereum or Ethereum tokens into cash in a bank account. We are considering entering into a partnership to make this easier.
+## OK, but how do I withdraw cash from UbiTok.io?
+UbiTok.io does not interface with the traditional banking system, so if you need cash in your bank account, you'll need to use a third-party to turn your Ethereum or Ethereum tokens into cash in a bank account.
 
 Over time, we're confident that withdrawing to cash in a bank account will become less necessary for many clients as:
- - More coins and tokens are built on top of Ethereum, so transactions stay on-chain;
- - More companies like [Decentralized Capital](https://www.decentralizedcapital.com/) (no connection or endorsement) offer stable Ethereum tokens backed by fiat currency, so you can (effectively) hold fiat currency on-chain;
- - More merchants accept payments in Ethereum or Ethereum-based tokens.
+ - more coins and tokens are built on top of Ethereum, so transactions stay on-chain;
+ - more companies like [Decentralized Capital](https://www.decentralizedcapital.com/) (no connection or endorsement) offer stable Ethereum tokens backed by fiat currency, so you can (effectively) hold fiat currency on-chain;
+ - more merchants accept payments in Ethereum or Ethereum-based tokens.
 
 ## What are your fees? How do UbiTok.io make money?
 Because we're not dealing with banks, or user sign-ups, or hosting providers, we have much lower costs than traditional exchanges.
@@ -62,11 +59,13 @@ We guarantee to:
 In order to avoid relying on trading fees, we hope to offer value-added products and services that build on top of our core exchange - see roadmap below.
 
 ## What's on the UbiTok.io roadmap?
-- Alpha testnet (play-money) release (Jul/Aug 2017);
-- Main-net (real-money) release offering small number of pairs, MetaMask/Mist only (Sep/Oct 2017);
+- Alpha testnet (play-money) release (Aug 2017);
+- Main-net (real-money) release offering small number of pairs, MetaMask/Mist only (Sep 2017);
 - Work in any browser without needing MetaMask or Mist installed (Oct 2017);
-- Developer tools and APIs for creating smart contracts and JS apps that trade via UbiTok.io - e.g. for market making, maintaining a pool of reserves, running ICOs (2017Q4);
-- Improved user interface and price charts (2017Q4);
+- Javascript APIs for trading on UbiTok.io - e.g. for market making, arbitrage (Nov 2017)
+- Solidity SDK for writing smart contracts that trade on UbiTok.io - e.g. for maintaining a pool of reserves, running ICOs (Dec 2017);
+- Improved user interface and price charts (early 2018);
+- Multi-language web UI (e.g. Simplified Chinese)  (early 2018);
 - Margin trading / lending market-place (tbc);
 - Consider offering our own asset backed tokens where it makes sense (tbc);
 - Host UbiTok.io front-end in Swarm/IPFS for total unstoppability (tbc);
