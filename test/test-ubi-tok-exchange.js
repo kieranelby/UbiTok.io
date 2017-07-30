@@ -1,8 +1,13 @@
+// Main test suite for the UbiTok.io exchange contract.
+//
+
 var BookERC20EthV1 = artifacts.require('BookERC20EthV1.sol');
 var TestToken = artifacts.require('TestToken.sol');
 
 var UbiTokTypes = require('../ubi-lib/ubi-tok-types.js');
 var BigNumber = UbiTokTypes.BigNumber;
+
+var ReferenceExchange = require('../reference/reference-exchange.js');
 
 contract('BookERC20EthV1 - create order errors', function(accounts) {
   var packedBuyOnePointZero = UbiTokTypes.encodePrice('Buy @ 1.00');
@@ -122,10 +127,27 @@ contract('BookERC20EthV1 - ERC20 payments', function(accounts) {
 var standardInitialBalanceBase = 1000000000;
 var standardInitialBalanceCntr =  100000000;
 
+function runReferenceExchange(clients, commands) {
+  var rx = new ReferenceExchange();
+  for (var client of clients) {
+    rx.depositBaseForTesting(client, standardInitialBalanceBase);
+    rx.depositCntrForTesting(client, standardInitialBalanceCntr);
+  }
+  for (var cmd of commands) {
+    if (cmd[0] === 'Create') {
+      rx.createOrder(cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7]);
+    }
+  }
+  return rx;
+}
+
 // Yeah, this is pretty gnarly - but at least the scenarios themsleves are
 // easy to read since all the ugliness is hidden here.
-// We build a promise chain that sets up initial balances, runs through the commands,
-// then checks the orders, book and balances are as expected at the end.
+// We run the commands against the reference exchange first.
+// Then we build a promise chain that sets up initial balances on the contract,
+// runs through the commands, then checks the orders, book and balances are as
+// specified in the scenario and same as the reference exchange at the end.
+
 function buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges) {
   var context = {};
   context.accounts = accounts;
@@ -136,13 +158,16 @@ function buildScenario(accounts, commands, expectedOrders, expectedBalanceChange
     context.testToken = instance;
     return context.uut.init(context.testToken.address);
   });
+  var orderIds = new Set();
   var clients = new Set();
   for (var cmd of commands) {
-    clients.add(cmd[2]);
+    clients.add(cmd[1]);
+    orderIds.add(cmd[2]);
   }
   for (var expectedBalanceChange of expectedBalanceChanges) {
     clients.add(expectedBalanceChange[0]);
   }
+  var referenceExchange = runReferenceExchange(clients, commands);
   var accountIdForClient = {};
   var nextAccountId = 1;
   for (var client of clients) {
@@ -173,15 +198,15 @@ function buildScenario(accounts, commands, expectedOrders, expectedBalanceChange
     chain = chain.then((function (ctx, a, c) {
       return function (lastResult) {
         return ctx.uut.createOrder(
-          c[3],
-          UbiTokTypes.encodePrice(c[4]),
-          c[5],
-          UbiTokTypes.encodeTerms(c[6]),
-          c[7],
+          c[2],
+          UbiTokTypes.encodePrice(c[3]),
+          c[4],
+          UbiTokTypes.encodeTerms(c[5]),
+          c[6],
           {from: ctx.accounts[a]}
         );
       };
-    }(context, accountIdForClient[cmd[2]], cmd)));
+    }(context, accountIdForClient[cmd[1]], cmd)));
   }
   for (var expectedOrder of expectedOrders) {
     chain = chain.then((function (ctx, eo) {
@@ -213,14 +238,38 @@ function buildScenario(accounts, commands, expectedOrders, expectedBalanceChange
       };
     }(context, accountIdForClient[client], expectedBalanceChange)));
   }
+  for (var orderId of orderIds) {
+    var refOrder = referenceExchange.getOrder(orderId);
+    chain = chain.then((function (ctx, oid) {
+      return function (lastResult) {
+        return ctx.uut.getOrder.call(oid);
+      };
+    }(context, orderId)));
+    chain = chain.then((function (ctx, oid, ro) {
+      return function (lastResult) {
+        var order = UbiTokTypes.decodeOrder(oid, lastResult);
+        assert.equal(order.price, ro.price, "price of order " + oid);
+        assert.equal(order.sizeBase, UbiTokTypes.decodeBaseAmount(ro.sizeBase), "sizeBase of order " + oid);
+        assert.equal(order.terms, ro.terms, "terms of order " + oid);
+        assert.equal(order.status, ro.status, "status of order " + oid);
+        assert.equal(order.reasonCode, ro.reasonCode, "reasonCode of order " + oid);
+        assert.equal(order.rawExecutedBase.toNumber(), ro.executedBase, "executedBase of order " + oid);
+        assert.equal(order.rawExecutedCntr.toNumber(), ro.executedCntr, "executedCntr of order " + oid);
+        assert.equal(order.rawFees.toNumber(), ro.fees, "fees of order " + oid);
+      };
+    }(context, orderId, refOrder)));
+  }
+  for (var client of clients) {
+    // TODO - compare client balance with ref balance
+  }
   return chain;
 }
 
 contract('BookERC20EthV1 - scenarios', function(accounts) {
   it("two orders that don't match", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
-      ['Create', 'OK', "client2", "201", "Sell @ 0.600", 100000, 'GTCNoGasTopup', 3]
+      ['Create', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', "client2", "201", "Sell @ 0.600", 100000, 'GTCNoGasTopup', 3]
     ];
     var expectedOrders = [
       ["101", 'Open', 'None', 0,  0],
@@ -237,8 +286,8 @@ contract('BookERC20EthV1 - scenarios', function(accounts) {
 contract('BookERC20EthV1', function(accounts) {
   it("two orders exactly match", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
-      ['Create', 'OK', "client2", "201", "Sell @ 0.500", 100000, 'GTCNoGasTopup', 3]
+      ['Create', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', "client2", "201", "Sell @ 0.500", 100000, 'GTCNoGasTopup', 3]
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000,  50000],
@@ -255,8 +304,8 @@ contract('BookERC20EthV1', function(accounts) {
 contract('BookERC20EthV1', function(accounts) {
   it("two orders partial match of 2nd", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
-      ['Create', 'OK', "client2", "201", "Sell @ 0.500", 300000, 'GTCNoGasTopup', 3]
+      ['Create', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', "client2", "201", "Sell @ 0.500", 300000, 'GTCNoGasTopup', 3]
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000,  50000],
@@ -273,8 +322,8 @@ contract('BookERC20EthV1', function(accounts) {
 contract('BookERC20EthV1', function(accounts) {
   it("two orders best execution", function() {
     var commands = [
-      ['Create', 'OK', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
-      ['Create', 'OK', "client2", "201", "Sell @ 0.400", 100000, 'GTCNoGasTopup', 3]
+      ['Create', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', "client2", "201", "Sell @ 0.400", 100000, 'GTCNoGasTopup', 3]
     ];
     var expectedOrders = [
       ["101", 'Done', 'None', 100000,  50000],

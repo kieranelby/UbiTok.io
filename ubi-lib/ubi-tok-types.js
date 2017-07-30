@@ -373,6 +373,22 @@ exports.decodeWalkClientOrder = function (order) {
   };
 };
 
+// Suitable for use with getOrder().
+exports.decodeOrder = function (orderId, order) {
+  return {
+    orderId: orderId,
+    client: order[0],
+    price: exports.decodePrice(order[1]),
+    sizeBase: exports.decodeBaseAmount(order[2]),
+    terms: exports.decodeTerms(order[3]),
+    status: exports.decodeStatus(order[4]),
+    reasonCode: exports.decodeReasonCode(order[5]),
+    rawExecutedBase: order[6],
+    rawExecutedCntr: order[7],
+    rawFees: order[8]
+  };
+};
+
 // Suitable for use with getOrderState().
 exports.decodeOrderState = function (orderId, state) {
   return {
