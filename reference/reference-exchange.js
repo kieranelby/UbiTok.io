@@ -288,9 +288,15 @@ ReferenceExchange.prototype._processOrder = function(order, maxMatches)  {
   var matchStopReason = this._matchAgainstBook(order, theirPriceStart, theirPriceEnd, maxMatches);
   if (order.executedBase > ourOriginalExecutedBase) {
     if (this._isBuyPrice(order.price)) {
-      this._creditFundsBase(order.client, order.executedBase - ourOriginalExecutedBase);
+      var liquidityTakenBase = order.executedBase - ourOriginalExecutedBase;
+      var feesBase = Math.floor(liquidityTakenBase * 0.0005);
+      this._creditFundsBase(order.client, liquidityTakenBase - feesBase);
+      order.fees = feesBase;
     } else {
-      this._creditFundsCntr(order.client, order.executedCntr - ourOriginalExecutedCntr);
+      var liquidityTakenCntr = order.executedCntr - ourOriginalExecutedCntr;
+      var feesCntr = Math.floor(liquidityTakenCntr * 0.0005);
+      this._creditFundsCntr(order.client, liquidityTakenCntr - feesCntr);
+      order.fees = feesCntr;
     }
   }
   if (order.terms === 'ImmediateOrCancel') {
