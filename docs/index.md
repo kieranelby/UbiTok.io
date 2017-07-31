@@ -16,15 +16,16 @@ Beta release coming soon ...
 Almost anything based on Ethereum (such as ERC20 tokens) can be traded on UbiTok.io, either against Ethereum or against other tokens.
 
 This includes coins/tokens connected to organisations in various industries such as:
-- DICE - gambling;
-- REP (Augur), GNO (Gnosis) - prediction markets;
-- BAT - advertising;
-- MYST - networking
+- [DICE](https://coinmarketcap.com/assets/etheroll/) - gambling;
+- [REP (Augur)](https://coinmarketcap.com/assets/augur/), [GNO](https://coinmarketcap.com/assets/gnosis-gno/) - prediction markets;
+- [BAT](https://coinmarketcap.com/assets/basic-attention-token/) - advertising;
+- [MYST](https://coinmarketcap.com/assets/mysterium/) - networking;
+- [EVM](https://coinmarketcap.com/assets/ethereum-movie-venture/) - movies
 
 As well as tokens backed by assets, including:
-- DGD - physical gold;
+- [DGD](https://coinmarketcap.com/assets/digixdao/) - physical gold;
 - Decentralized Capital (DC) - Bitcoin, USD, EUR assets;
-- BNT (Bancor), VERI - smart reserves
+- [BNT (Bancor)](https://coinmarketcap.com/assets/bancor/) - smart reserves
 
 ## How does UbiTok.io compare to other decentralized exchanges?
 UbiTok.io is the first decentralized exchange to meet the following three tests:
