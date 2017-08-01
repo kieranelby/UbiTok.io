@@ -157,6 +157,7 @@ contract BookERC20EthV1 {
   uint constant feePpm = 500;
   
   // fees charged are given to:
+  // TODO - change name
 
   address investorProxy;
 
@@ -870,7 +871,7 @@ contract BookERC20EthV1 {
     uint128 theirOrderId = orderChainForOccupiedPrice[theirPrice].firstOrderId;
     matchStopReason = MatchStopReason.None;
     while (true) {
-      if (maxMatches == 0) {
+      if (matchesLeft == 0) {
         matchStopReason = MatchStopReason.MaxMatches;
         break;
       }
@@ -887,18 +888,15 @@ contract BookERC20EthV1 {
     }
     ourOrder.executedBase = workingOurExecutedBase;
     ourOrder.executedCntr = workingOurExecutedCntr;
-    if (matchStopReason == MatchStopReason.MaxMatches) {
-      removedLastAtPrice = false;
+    if (theirOrderId == 0) {
+      orderChainForOccupiedPrice[theirPrice].firstOrderId = 0;
+      orderChainForOccupiedPrice[theirPrice].lastOrderId = 0;
+      removedLastAtPrice = true;
     } else {
-      if (theirOrderId == 0) {
-        orderChainForOccupiedPrice[theirPrice].firstOrderId = 0;
-        orderChainForOccupiedPrice[theirPrice].lastOrderId = 0;
-        removedLastAtPrice = true;
-      } else {
-        orderChainForOccupiedPrice[theirPrice].firstOrderId = theirOrderId;
-        orderChainNodeForOpenOrderId[theirOrderId].prevOrderId = 0;
-        removedLastAtPrice = false;
-      }
+      // TODO - unnecessary work if maxMatches = 0? is this always safe?
+      orderChainForOccupiedPrice[theirPrice].firstOrderId = theirOrderId;
+      orderChainNodeForOpenOrderId[theirOrderId].prevOrderId = 0;
+      removedLastAtPrice = false;
     }
   }
   
@@ -1086,9 +1084,12 @@ contract BookERC20EthV1 {
   //  to keep up-to-date with the market order events).
   //
   // To walk the book, the caller should start by calling walkBook with the
-  // most aggressive buy price. If the price returned is the least aggressive
-  // buy price, the side is complete. Otherwise, call walkBook again with the
-  // price returned + 1. Then repeat for the sell side.
+  // most aggressive buy price (Buy @ 999000).
+  // If the price returned is the least aggressive buy price (Buy @ 0.000001),
+  // the side is complete.
+  // Otherwise, call walkBook again with the (packed) price returned + 1.
+  // Then repeat for the sell side, starting with Sell @ 0.000001 and stopping
+  // when Sell @ 999000 is returned.
   //
   function walkBook(uint16 fromPrice) public constant returns (
       uint16 price, uint depthBase, uint orderCount, uint blockNumber

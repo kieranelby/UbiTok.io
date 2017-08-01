@@ -19,8 +19,7 @@ function ReferenceExchange() {
   this.orderChainForPrice = {};
   this.baseMinRemainingSize = 10;
   this.baseMinInitialSize = 100;
-  this.CntrMinRemainingSize = 1000;
-  this.CntrMinInitialSize = 10000;
+  this.cntrMinInitialSize = 10000;
 }
 module.exports = ReferenceExchange;
 
@@ -51,6 +50,43 @@ ReferenceExchange.prototype._creditFundsCntr = function(client, amountCntr)  {
     this.balanceCntrForClient[client] = 0;
   }
   this.balanceCntrForClient[client] += amountCntr;
+};
+
+// Follows the slightly weird convention used by walkBook
+ReferenceExchange.prototype.getBook = function()  {
+  var bidSide = [];
+  var askSide = [];
+  // ok, this is ludicrously inefficient
+  var allPrices = this._priceRange('Buy @ 999000', 'Buy @ 0.00000100');
+  var price;
+  for (var i = 0; i < allPrices.length; i++) {
+    price = allPrices[i];
+    if (this.orderChainForPrice.hasOwnProperty(price)) {
+      var orderChain = this.orderChainForPrice[price];
+      var depth = 0.0;
+      var count = 0;
+      for (var order of orderChain) {
+        depth += (order.sizeBase - order.executedBase);
+        count++;
+      }
+      bidSide.push([price, depth, count]);
+    }
+  }
+  var allPrices = this._priceRange('Sell @ 0.00000100', 'Sell @ 999000');
+  for (var i = 0; i < allPrices.length; i++) {
+    price = allPrices[i];
+    if (this.orderChainForPrice.hasOwnProperty(price)) {
+      var orderChain = this.orderChainForPrice[price];
+      var depth = 0.0;
+      var count = 0;
+      for (var order of orderChain) {
+        depth += (order.sizeBase - order.executedBase);
+        count++;
+      }
+      askSide.push([price, depth, count]);
+    }
+  }
+  return [bidSide, askSide];
 };
 
 ReferenceExchange.prototype.getOrder = function(orderId)  {
@@ -89,7 +125,7 @@ ReferenceExchange.prototype.createOrder = function(client, orderId, price, sizeB
     return;
   }
   var sizeCntr = this.computeAmountCntr(sizeBase, price);
-  if (sizeCntr < this.CntrMinInitialSize || sizeCntr > 999999999999) {
+  if (sizeCntr < this.cntrMinInitialSize || sizeCntr > 999999999999) {
     order.status = 'Rejected';
     order.reasonCode = 'InvalidSize';
     return;
@@ -104,9 +140,46 @@ ReferenceExchange.prototype.createOrder = function(client, orderId, price, sizeB
 };
 
 ReferenceExchange.prototype.cancelOrder = function(client, orderId)  {
+  var order = this.orderForOrderId[orderId];
+  if (order.client !== client) {
+    throw new Error('not your order');
+  }
+  if (order.status !== 'Open' && order.status !== 'NeedsGas') {
+    // not really an error as such
+    return;
+  }
+  if (order.status === 'Open') {
+    let orderChain = this.orderChainForPrice[order.price];
+    if (!orderChain) {
+      throw new Error('assertion broken - must be a chain for price of open order');
+    }
+    let newOrderChain = orderChain.filter((v) => {
+      return v.orderId !== orderId;
+    });
+    if (newOrderChain.length === orderChain.length) {
+      throw new Error('assertion broken - open order must be in the chain for its price');
+    }
+    if (newOrderChain.length === 0) {
+      delete this.orderChainForPrice[order.price];
+    } else {
+      // TODO - raise events!
+      this.orderChainForPrice[order.price] = newOrderChain;
+    }
+  }
+  this._refundUnmatchedAndFinish(order, 'Done', 'ClientCancel');
 };
 
 ReferenceExchange.prototype.continueOrder = function(client, orderId, maxMatches)  {
+  var order = this.orderForOrderId[orderId];
+  if (order.client !== client) {
+    throw new Error('not your order');
+  }
+  if (order.status !== 'NeedsGas') {
+    // not really an error as such?
+    return;
+  }
+  order.status = 'Unknown';
+  this._processOrder(order, maxMatches);
 };
 
 // For the reference implementation, our "native" price is the human-friendly one,
@@ -303,10 +376,10 @@ ReferenceExchange.prototype._processOrder = function(order, maxMatches)  {
     if (matchStopReason === 'Satisfied') {
       this._refundUnmatchedAndFinish(order, 'Done', 'None');
       return;
-    } else if (matchStopReason === MatchStopReason.MaxMatches) {
+    } else if (matchStopReason === 'MaxMatches') {
       this._refundUnmatchedAndFinish(order, 'Done', 'TooManyMatches');
       return;
-    } else if (matchStopReason === MatchStopReason.BookExhausted) {
+    } else if (matchStopReason === 'BookExhausted') {
       this._refundUnmatchedAndFinish(order, 'Done', 'Unmatched');
       return;
     }
@@ -334,7 +407,7 @@ ReferenceExchange.prototype._processOrder = function(order, maxMatches)  {
       this._refundUnmatchedAndFinish(order, 'Done', 'None');
       return;
     } else if (matchStopReason === 'MaxMatches') {
-      order.status = 'MaxMatches';
+      order.status = 'NeedsGas';
       return;
     } else if (matchStopReason === 'BookExhausted') {
       this._enterOrder(order);
@@ -408,7 +481,7 @@ ReferenceExchange.prototype._matchWithOccupiedPrice = function(order, theirPrice
   var matchesLeft = maxMatches;
   var orderChain = this.orderChainForPrice[theirPrice];
   while (true) {
-    if (maxMatches === 0) {
+    if (matchesLeft === 0) {
       matchStopReason = 'MaxMatches';
       break;
     }
@@ -476,6 +549,9 @@ ReferenceExchange.prototype._priceRange = function(priceStart, priceEnd)  {
   var splitPriceStart = this._splitPrice(priceStart);
   var splitPriceEnd = this._splitPrice(priceEnd);
   var prices = [];
+  if (splitPriceStart[0] !== splitPriceEnd[0]) {
+    throw new Error('mixed directions not supported');
+  }
   if (splitPriceStart[0] === 'Buy') {
     for (var e = splitPriceStart[2]; e >= splitPriceEnd[2]; e--) {
       var mStart = 999;
