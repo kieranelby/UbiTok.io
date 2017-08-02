@@ -103,7 +103,7 @@ ReferenceExchange.prototype.createOrder = function(client, orderId, price, sizeB
   var order = {
     orderId: orderId,
     client: client,
-    price: price,
+    price: this._normalisePrice(price),
     sizeBase: sizeBase,
     sizeCntr: 0,
     terms: terms,
@@ -114,7 +114,7 @@ ReferenceExchange.prototype.createOrder = function(client, orderId, price, sizeB
     fees: 0
   };
   this.orderForOrderId[orderId] = order;
-  if (!this._isValidPrice(price)) {
+  if (!this._isValidPrice(order.price)) {
     order.status = 'Rejected';
     order.reasonCode = 'InvalidPrice';
     return;
@@ -182,23 +182,74 @@ ReferenceExchange.prototype.continueOrder = function(client, orderId, maxMatches
   this._processOrder(order, maxMatches);
 };
 
-// For the reference implementation, our "native" price is the human-friendly one,
-// examples are:
+// Take the number part of a price entered by a human as a string (e.g. '1.23'),
+// along with the intended direction ('Buy' or 'Sell') (not entered by a human),
+// and turn it into either [ error, undefined] or [ undefined, result] where:
+//   error = { msg: 'problem description', suggestion: 'optional replacement'}
+//   result = [ direction, mantissa, exponent ]
+// where direction = Buy/Sell, mantissa is a number from 100-999, exponent is
+// a number from -5 to 6 as used by the book contract's packed price format.
 //
-//  'Invalid'
-//  'Buy @ 0.00000100' // always write out all 3 sig figs
-//  'Buy @ 0.00000101'
-//  ...
-//  'Buy @ 1.00'
-//  ...
-//  'Buy @ 998000'
-//  'Buy @ 999000'
-//  'Sell @ 0.00000100' // always include leading zero before decimal point
-//  ...
-//  'Sell @ 999000'
+// e.g. ('Buy', '12.3') -> [undefined, ['Buy', 123, 2]]
+//
+ReferenceExchange.prototype._parseFriendlyPricePart = function(direction, pricePart)  {
+  if (direction !== 'Buy' && direction !== 'Sell') {
+    return [{msg: 'has an unknown problem'}, undefined];
+  }
+  if (pricePart === undefined) {
+    return [{msg: 'is blank'}, undefined];
+  }
+  let trimmedPricePart = pricePart.trim();
+  if (trimmedPricePart === '') {
+    return [{msg: 'is blank'}, undefined];
+  }
+  let looksLikeANumber = /^[0-9]*\.?[0-9]*$/.test(trimmedPricePart);
+  if (!looksLikeANumber) {
+    return [{msg: 'does not look like a regular number'}, undefined];
+  }
+  let number = new BigNumber(NaN);
+  try {
+    number = new BigNumber(trimmedPricePart);
+  } catch (e) {
+  }
+  if (number.isNaN() || !number.isFinite()) {
+    return [{msg: 'does not look like a regular number'}, undefined];
+  }
+  const minPrice = new BigNumber('0.000001');
+  const maxPrice = new BigNumber('999000');
+  if (number.lt(minPrice)) {
+    return [{msg: 'is too small', suggestion: minPrice.toFixed()}, undefined];
+  }
+  if (number.gt(maxPrice)) {
+    return [{msg: 'is too large', suggestion: maxPrice.toFixed()}, undefined];
+  }
+  let currentPower = new BigNumber('1000000');
+  for (let exponent = 6; exponent >= -5; exponent--) {
+    if (number.gte(currentPower.times('0.1'))) {
+      let rawMantissa = number.div(currentPower);
+      let mantissa = rawMantissa.mul(1000);
+      if (mantissa.isInteger()) {
+        if (mantissa.lt(100) || mantissa.gt(999)) {
+          return [{msg: 'has an unknown problem'}, undefined];
+        }
+        return [undefined, [direction, mantissa.toNumber(), exponent]];
+      } else {
+        // round in favour of the order placer
+        let roundMode = (direction === 'Buy') ? BigNumber.ROUND_DOWN : BigNumber.ROUND_UP;
+        let roundMantissa = mantissa.round(0, roundMode);
+        let roundedNumber = roundMantissa.div(1000).mul(currentPower);
+        return [{msg: 'has too many significant figures', suggestion: roundedNumber.toFixed()}, undefined];
+      }
+    }
+    currentPower = currentPower.times('0.1');
+  }
+  return [{msg: 'has an unknown problem'}, undefined];
+}
+
+// e.g. 'Buy @ 12.3' -> ['Buy', 123, 2]
 //
 ReferenceExchange.prototype._splitPrice = function(price)  {
-  var invalidSplitPrice = ['Invalid', 0, 0];
+  const invalidSplitPrice = ['Invalid', 0, 0];
   if (!price.startsWith) {
     return invalidSplitPrice;
   }
@@ -213,56 +264,12 @@ ReferenceExchange.prototype._splitPrice = function(price)  {
   } else {
     return invalidSplitPrice;
   }
-  var match;
-  match = pricePart.match(/^([1-9][0-9][0-9])000$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), 6];
+  let errorAndResult = this._parseFriendlyPricePart(direction, pricePart);
+  if (errorAndResult[0]) {
+    return invalidSplitPrice;
+  } else {
+    return errorAndResult[1];
   }
-  match = pricePart.match(/^([1-9][0-9][0-9])00$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), 5];
-  }
-  match = pricePart.match(/^([1-9][0-9][0-9])0$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), 4];
-  }
-  match = pricePart.match(/^([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), 3];
-  }
-  match = pricePart.match(/^([1-9][0-9])\.([0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10) * 10 + parseInt(match[2], 10), 2];
-  }
-  match = pricePart.match(/^([1-9])\.([0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10) * 100 + parseInt(match[2], 10), 1];
-  }
-  match = pricePart.match(/^0\.([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), 0];
-  }
-  match = pricePart.match(/^0\.0([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), -1];
-  }
-  match = pricePart.match(/^0\.00([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), -2];
-  }
-  match = pricePart.match(/^0\.000([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), -3];
-  }
-  match = pricePart.match(/^0\.0000([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), -4];
-  }
-  match = pricePart.match(/^0\.00000([1-9][0-9][0-9])$/);
-  if (match) {
-    return [direction, parseInt(match[1], 10), -5];
-  }
-  return invalidSplitPrice;
 };
 
 ReferenceExchange.prototype._makePrice = function(direction, mantissa, exponent) {
@@ -295,6 +302,11 @@ ReferenceExchange.prototype._makePrice = function(direction, mantissa, exponent)
 ReferenceExchange.prototype._isValidPrice = function(price)  {
   var splitPrice = this._splitPrice(price);
   return splitPrice[0] !== 'Invalid';
+};
+
+ReferenceExchange.prototype._normalisePrice = function(price)  {
+  var splitPrice = this._splitPrice(price);
+  return this._makePrice(splitPrice[0], splitPrice[1], splitPrice[2]);
 };
 
 ReferenceExchange.prototype._isBuyPrice = function(price) {
@@ -364,12 +376,12 @@ ReferenceExchange.prototype._processOrder = function(order, maxMatches)  {
       var liquidityTakenBase = order.executedBase - ourOriginalExecutedBase;
       var feesBase = Math.floor(liquidityTakenBase * 0.0005);
       this._creditFundsBase(order.client, liquidityTakenBase - feesBase);
-      order.fees = feesBase;
+      order.fees += feesBase;
     } else {
       var liquidityTakenCntr = order.executedCntr - ourOriginalExecutedCntr;
       var feesCntr = Math.floor(liquidityTakenCntr * 0.0005);
       this._creditFundsCntr(order.client, liquidityTakenCntr - feesCntr);
-      order.fees = feesCntr;
+      order.fees += feesCntr;
     }
   }
   if (order.terms === 'ImmediateOrCancel') {

@@ -251,8 +251,8 @@ function buildScenario(accounts, commands, expectedOrders, expectedBalanceChange
         var state = UbiTokTypes.decodeOrderState(eo[0], lastResult);
         assert.equal(state.status, eo[1], "status of order " + eo[0]);
         assert.equal(state.reasonCode, eo[2], "reasonCode of order " + eo[0]);
-        assert.equal(state.rawExecutedBase, eo[3], "rawExecutedBase of order " + eo[0]);
-        assert.equal(state.rawExecutedCntr, eo[4], "rawExecutedCntr of order " + eo[0]);
+        assert.equal(state.rawExecutedBase.toNumber(), eo[3], "rawExecutedBase of order " + eo[0]);
+        assert.equal(state.rawExecutedCntr.toNumber(), eo[4], "rawExecutedCntr of order " + eo[0]);
       };
     }(context, expectedOrder)));
   }
@@ -476,6 +476,124 @@ contract('BookERC20EthV1', function(accounts) {
 });
 
 contract('BookERC20EthV1', function(accounts) {
+  it("cancel order among others then match", function() {
+    var commands = [
+      ['Create', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', "client2", "201",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', "client3", "301",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Cancel', "client2", "201"],
+      ['Create', "client4", "401",  "Sell @ 0.500", 300000, 'GTCNoGasTopup', 3],
+    ];
+    var expectedOrders = [
+      ["101", 'Done', 'None', 100000,  50000],
+      ["201", 'Done', 'ClientCancel', 0, 0],
+      ["301", 'Done', 'None', 100000,  50000],
+      ["401", 'Open', 'None', 200000, 100000],
+    ];
+    var expectedBalanceChanges = [
+    ];
+    return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('BookERC20EthV1', function(accounts) {
+  it("cancel order among others then match - variation with cancelled first", function() {
+    var commands = [
+      ['Create', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', "client2", "201",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', "client3", "301",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Cancel', "client1", "101"],
+      ['Create', "client4", "401",  "Sell @ 0.500", 300000, 'GTCNoGasTopup', 3],
+    ];
+    var expectedOrders = [
+      ["101", 'Done', 'ClientCancel', 0, 0],
+      ["201", 'Done', 'None', 100000,  50000],
+      ["301", 'Done', 'None', 100000,  50000],
+      ["401", 'Open', 'None', 200000, 100000],
+    ];
+    var expectedBalanceChanges = [
+    ];
+    return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('BookERC20EthV1', function(accounts) {
+  it("cancel order among others then match - variation with cancelled last", function() {
+    var commands = [
+      ['Create', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', "client2", "201",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', "client3", "301",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Cancel', "client3", "301"],
+      ['Create', "client4", "401",  "Sell @ 0.500", 300000, 'GTCNoGasTopup', 3],
+    ];
+    var expectedOrders = [
+      ["101", 'Done', 'None', 100000,  50000],
+      ["201", 'Done', 'None', 100000,  50000],
+      ["301", 'Done', 'ClientCancel', 0, 0],
+      ["401", 'Open', 'None', 200000, 100000],
+    ];
+    var expectedBalanceChanges = [
+    ];
+    return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('BookERC20EthV1', function(accounts) {
+  it("cancel only order at price then match above", function() {
+    var commands = [
+      ['Create', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', "client2", "201",  "Buy @ 0.600", 100000, 'GTCNoGasTopup', 3],
+      ['Cancel', "client2", "201"],
+      ['Create', "client3", "301",  "Sell @ 0.500", 300000, 'GTCNoGasTopup', 3],
+    ];
+    var expectedOrders = [
+      ["101", 'Done', 'None', 100000, 50000],
+      ["201", 'Done', 'ClientCancel', 0, 0],
+      ["301", 'Open', 'None', 100000, 50000],
+    ];
+    var expectedBalanceChanges = [
+    ];
+    return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('BookERC20EthV1', function(accounts) {
+  it("cancel completed order", function() {
+    var commands = [
+      ['Create', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', "client2", "201",  "Sell @ 0.500", 300000, 'GTCNoGasTopup', 3],
+      ['Cancel', "client1", "101"],
+    ];
+    var expectedOrders = [
+      ["101", 'Done', 'None', 100000, 50000],
+      ["201", 'Open', 'None', 100000, 50000],
+    ];
+    var expectedBalanceChanges = [
+      ["client1", +100000, -50000],
+    ];
+    return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('BookERC20EthV1', function(accounts) {
+  it("cancel partially filled order", function() {
+    var commands = [
+      ['Create', "client1", "101",  "Buy @ 0.500", 100000, 'GTCNoGasTopup', 3],
+      ['Create', "client2", "201",  "Sell @ 0.500", 60000, 'GTCNoGasTopup', 3],
+      ['Cancel', "client1", "101"],
+    ];
+    var expectedOrders = [
+      ["101", 'Done', 'ClientCancel', 60000, 30000],
+      ["201", 'Done', 'None', 60000, 30000],
+    ];
+    var expectedBalanceChanges = [
+      ["client1", +60000, -30000],
+    ];
+    return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('BookERC20EthV1', function(accounts) {
   it("enter needs gas state", function() {
     var commands = [
       ['Create', "client1", "101", "Buy @ 0.500",  100000, 'GTCNoGasTopup', 3],
@@ -507,6 +625,28 @@ contract('BookERC20EthV1', function(accounts) {
       ["201", 'Open', 'None', 200000, 100000],
     ];
     var expectedBalanceChanges = [
+    ];
+    return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('BookERC20EthV1', function(accounts) {
+  it("cancel needs gas order", function() {
+    var commands = [
+      ['Create', "client1", "101",  "Buy @ 0.500", 20000, 'GTCNoGasTopup', 3],
+      ['Create', "client1", "102",  "Buy @ 0.500", 20000, 'GTCNoGasTopup', 3],
+      ['Create', "client1", "103",  "Buy @ 0.500", 20000, 'GTCNoGasTopup', 3],
+      ['Create', "client2", "201",  "Sell @ 0.500", 60000, 'GTCWithGasTopup', 1],
+      ['Cancel', "client2", "201"],
+    ];
+    var expectedOrders = [
+      ["101", 'Done', 'None', 20000, 10000],
+      ["102", 'Open', 'None', 0, 0],
+      ["103", 'Open', 'None', 0, 0],
+      ["201", 'Done', 'ClientCancel', 20000, 10000],
+    ];
+    var expectedBalanceChanges = [
+      ["client2", -20000, +10000 * 0.9995],
     ];
     return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
   });
@@ -597,6 +737,30 @@ contract('BookERC20EthV1', function(accounts) {
     var expectedBalanceChanges = [
       ["client1",  100000, -50000],
       ["client2", -100000,  50000 * 0.9995]
+    ];
+    return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
+  });
+});
+
+contract('BookERC20EthV1', function(accounts) {
+  it("high gas usage", function() {
+    var commands = [
+      ['Create', "client1", "101",  "Buy @ 0.00500", 2000000, 'GTCNoGasTopup', 3],
+      ['Create', "client1", "102",  "Buy @ 0.0100",  1000000, 'GTCNoGasTopup', 3],
+      ['Create', "client1", "103",  "Buy @ 0.0500",   200000, 'GTCNoGasTopup', 3],
+      ['Create', "client1", "104",  "Buy @ 0.100",    100000, 'GTCNoGasTopup', 3],
+      ['Create', "client1", "105",  "Buy @ 0.500",     20000, 'GTCNoGasTopup', 3],
+      ['Create', "client1", "106",  "Buy @ 1.000",     10000, 'GTCNoGasTopup', 3],
+      ['Create', "client1", "107",  "Buy @ 5.000",      2000, 'GTCNoGasTopup', 3],
+      ['Create', "client1", "108",  "Buy @ 10.000",     1000, 'GTCNoGasTopup', 3],
+      ['Create', "client1", "109",  "Buy @ 50.000",      200, 'GTCNoGasTopup', 3],
+      ['Create', "client1", "110",  "Buy @ 100.000",     100, 'GTCNoGasTopup', 3],
+      ['Create', "client2", "201", "Sell @ 0.0050",  4000000, 'GTCWithGasTopup', 12],
+    ];
+    var expectedOrders = [
+      ["201", 'Open', 'None', 3333300, 100000],
+    ];
+    var expectedBalanceChanges = [
     ];
     return buildScenario(accounts, commands, expectedOrders, expectedBalanceChanges);
   });
