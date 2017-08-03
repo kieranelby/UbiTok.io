@@ -34,7 +34,11 @@ UbiTok.io is the first decentralized exchange to meet the following three tests:
  - offers a [full limit order book](./trading-rules.md), giving clients the best possible price and the exchange features you expect.
 
 ## Who's behind UbiTok.io?
-UbiTok.io's founder and principal technologist, Kieran Elby, has a background in algorithmic trading systems. He previously spent over a decade building secure, high volume gambling sites for leading bookmakers. He first dabbled in bitcoin in 2013 before flipping to Ethereum in 2015.
+In one sense, no-one is - the exchange runs entirely on the Ethereum blockchain, and the open source web UI is statically hosted on github (pending move to Swarm).
+
+UbiTok.io was created by [Kieran Elby](https://www.linkedin.com/in/kieranelby/), a technologist with a background in algorithmic trading systems. He previously spent over a decade building secure, high volume gambling sites for leading bookmakers. He first dabbled in bitcoin in 2013 before flipping to Ethereum in 2015.
+
+The UbiTok.io software copyright and other intellectual property is held by [Bonnag Limited](https://bonnag.com), a UK registered company.
 
 We're interested in growing our team in the near future - contact opportunities@ubitok.io.
 
@@ -75,11 +79,11 @@ In order to avoid relying on trading fees, we hope to offer value-added products
 Perhaps you have some ideas for smart tokens that can be traded on our exchange, or for autonomous smart contracts that place orders into the exchange - we look forward to seeing what can be done with a fully on-chain trading venue.
 
 ## Are you planning a crowd-sale?
-We are considering a crowd-sale to allow us to invest in marketing, better UI design, client support - and most importantly to accelerate our product development.
+We are considering using crowd-funding to accelerate our product development (and improve our design and marketing).
 
 We want to make sure we have a working product and a solid business model first though.
 
-Email fundraising@ubitok.io if you'd like to hear about early investment opportunities.
+Email fundraising@ubitok.io if you'd like to hear about early opportunities to back us.
 
 ## Give me some technical details!
 Take a look at our main smart contract here: [BookERC20EthV1.sol](https://github.com/kieranelby/UbiTok.io/blob/master/contracts/BookERC20EthV1.sol).
