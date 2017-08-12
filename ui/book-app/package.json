@@ -4,7 +4,7 @@
   "author": "Bonnag Limited",
   "license": "Proprietary",
   "private": true,
-  "homepage" : "https://ubitok.io/exchange/DEMO-ETH/",
+  "homepage" : "https://ubitok.io/exchange/TEST-ETH/",
   "dependencies": {
     "eslint": "^4.4.1",
     "immutability-helper": "^2.2.2",
