@@ -6,10 +6,6 @@ import mistLogo from './mist.png';
 
 class BridgeStatus extends React.Component {
 
-  constructor(props) {
-    super(props);
-  }
-
   render = () => {
     return (<div>{
       (!this.props.bridgeStatus.canMakePublicCalls && this.props.bridgeStatus.withinGracePeriod) ? (
@@ -22,13 +18,13 @@ class BridgeStatus extends React.Component {
         <p>We suggest using one of the following clients to connect to Ethereum:</p>
         <Row>
             <Col sm={6}>
-                <a href="https://metamask.io/" target="_blank">
+                <a href="https://metamask.io/" target="_blank" rel="noopener noreferrer">
                   <h4>Metamask Chrome Extension</h4>
                   <img src={metamaskLogo} className="Metamask-logo" alt="Metamask" />
                 </a>
             </Col>
             <Col sm={6}>
-                <a href="https://github.com/ethereum/mist/releases" target="_blank">
+                <a href="https://github.com/ethereum/mist/releases" target="_blank" rel="noopener noreferrer">
                   <h4>Mist Browser</h4>
                   <img src={mistLogo} className="Mist-logo" alt="Mist" />
                 </a>
@@ -37,7 +33,7 @@ class BridgeStatus extends React.Component {
       </Panel>
       ) : this.props.bridgeStatus.unsupportedNetwork ? (
       <Panel header="Unsupported Ethereum Network" bsStyle="danger">
-        <p>UbiTok.io is currently only available on the Ropsten Test Network.</p>
+        <p>This UbiTok.io book is only available on the {this.props.bridgeStatus.targetNetworkName}.</p>
         <p>Try changing Ethereum Network in your Ethereum Client (e.g. Metamask, Mist).</p>
       </Panel>
       ) : this.props.bridgeStatus.networkChanged ? (

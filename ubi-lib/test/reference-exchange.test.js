@@ -1,5 +1,10 @@
+// Tests for the reference exchange in isolation.
+// We mostly test it in conjuction with the contract, but it's
+// useful to prototype some tests here (and test semi-internal bits).
+
 var expect    = require("chai").expect;
 var ReferenceExchange = require("../reference-exchange");
+var BigNumber = require("bignumber.js");
 
 var runScenario = function (commands, expectedOrders, expectedBalanceChanges) {
   var uut = new ReferenceExchange();
@@ -13,24 +18,24 @@ var runScenario = function (commands, expectedOrders, expectedBalanceChanges) {
   var standardInitialBalanceBase   = 1000000000;
   var standardInitialBalanceQuoted =  100000000;
   for (var client of clients) {
-    uut.depositBaseForTesting(client, standardInitialBalanceBase);
-    uut.depositCntrForTesting(client, standardInitialBalanceQuoted);
+    uut.depositBaseForTesting(client, new BigNumber(standardInitialBalanceBase));
+    uut.depositCntrForTesting(client, new BigNumber(standardInitialBalanceQuoted));
   }
   for (var cmd of commands) {
-    uut.createOrder(cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7]);
+    uut.createOrder(cmd[2], cmd[3], cmd[4], new BigNumber(cmd[5]), cmd[6], cmd[7]);
   }
   for (var eo of expectedOrders) {
     var orderId = eo[0];
     var ao = uut.getOrder(orderId);
     expect(ao.status, "order " + orderId).to.equal(eo[1]);
     expect(ao.reasonCode, "order " + orderId).to.equal(eo[2]);
-    expect(ao.executedBase, "executed base of order " + orderId).to.equal(eo[3]);
-    expect(ao.executedCntr, "executed quoted of order " + orderId).to.equal(eo[4]);
+    expect(ao.executedBase.toNumber(), "executed base of order " + orderId).to.equal(eo[3]);
+    expect(ao.executedCntr.toNumber(), "executed quoted of order " + orderId).to.equal(eo[4]);
   }
   for (var ebc of expectedBalanceChanges) {
     var client = ebc[0];
-    var ab = uut.getClientBalances(client)[0];
-    var aq = uut.getClientBalances(client)[1];
+    var ab = uut.getClientBalances(client)[0].toNumber();
+    var aq = uut.getClientBalances(client)[1].toNumber();
     var abc = ab - standardInitialBalanceBase;
     var aqc = aq - standardInitialBalanceQuoted;
     expect(abc, "base balance change for " + client).to.equal(ebc[1]);
@@ -55,29 +60,29 @@ describe("ReferenceExchange", function() {
   describe("Funds Management", function() {
     it("accepts test deposits", function() {
       var uut = new ReferenceExchange();
-      uut.depositBaseForTesting("client1", 100);
-      uut.depositBaseForTesting("client1", 200);
-      uut.depositCntrForTesting("client1", 5000);
-      expect(uut.getClientBalances("client1")[0]).to.equal(300);
-      expect(uut.getClientBalances("client1")[1]).to.equal(5000);
-      expect(uut.getClientBalances("unknownClient")[0]).to.equal(0);
+      uut.depositBaseForTesting("client1", new BigNumber(100));
+      uut.depositBaseForTesting("client1", new BigNumber(200));
+      uut.depositCntrForTesting("client1", new BigNumber(5000));
+      expect(uut.getClientBalances("client1")[0].toNumber()).to.equal(300);
+      expect(uut.getClientBalances("client1")[1].toNumber()).to.equal(5000);
+      expect(uut.getClientBalances("unknownClient")[0].toNumber()).to.equal(0);
     });
   });
   describe("Order Creation", function() {
     it("returns simple created order", function() {
       var uut = new ReferenceExchange();
-      uut.depositCntrForTesting("client1", 30000);
+      uut.depositCntrForTesting("client1", new BigNumber(30000));
       // client, orderId, sidedPrice, sizeBase, terms
-      uut.createOrder("client1", "101", "Buy @ 2.50", 10000, 'GTCNoGasTopup', 3);
+      uut.createOrder("client1", "101", "Buy @ 2.50",  new BigNumber(10000), 'GTCNoGasTopup', 3);
       var order = uut.getOrder("101");
       expect(order.client).to.equal("client1");
       expect(order.price).to.equal("Buy @ 2.50");
       expect(order.terms).to.equal('GTCNoGasTopup');
-      expect(order.sizeBase).to.equal(10000);
+      expect(order.sizeBase.toNumber()).to.equal(10000);
       expect(order.status).to.equal('Open');
       expect(order.reasonCode).to.equal('None');
-      expect(order.executedBase).to.equal(0);
-      expect(order.executedCntr).to.equal(0);
+      expect(order.executedBase.toNumber()).to.equal(0);
+      expect(order.executedCntr.toNumber()).to.equal(0);
     });
   });
   describe("Order Matching", function() {

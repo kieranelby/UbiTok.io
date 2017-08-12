@@ -1,22 +1,20 @@
-/*
- * Conversion functions for talking to the BookERC20EthV1 contract.
-*/
+// Conversion functions for talking to the BookERC20EthV1 contract.
 
-const BigNumber = require('bignumber.js');
-const uuidv4 = require('uuid/v4');
+var BigNumber = require('bignumber.js');
+var uuidv4 = require('uuid/v4');
 
-const enumTradableType = [
+var enumTradableType = [
   'Ether',
   'ERC20'
 ];
 
-const enumDirection = [
+var enumDirection = [
   'Invalid',
   'Buy',
   'Sell'
 ];
 
-const enumStatus = [
+var enumStatus = [
   'Unknown',
   'Rejected',
   'Open',
@@ -26,7 +24,7 @@ const enumStatus = [
   'FailedSend' // web3 only
 ];
 
-const enumReasonCode = [
+var enumReasonCode = [
   'None',
   'InvalidPrice',
   'InvalidSize',
@@ -38,14 +36,14 @@ const enumReasonCode = [
   'ClientCancel'
 ];
 
-const enumTerms = [
+var enumTerms = [
   'GTCNoGasTopup',
   'GTCWithGasTopup',
   'ImmediateOrCancel',
   'MakerOnly'
 ];
 
-const enumMarketOrderEventType = [
+var enumMarketOrderEventType = [
   'Add',
   'Remove',
   'CompleteFill',
@@ -107,8 +105,12 @@ exports.decodeMarketOrderEventType = function (encodedMarketOrderEventType) {
   return decodeEnum(enumMarketOrderEventType, encodedMarketOrderEventType);
 };
 
+// TODO - need to find sensible way to allow these to vary
+
 exports.baseDecimals = 18;
 exports.cntrDecimals = 18;
+exports.rwrdDecimals = 18;
+
 exports.minimumPriceExponent = -5;
 exports.maxBuyPricePacked = 1;
 exports.minBuyPricePacked = 10800;
@@ -155,11 +157,11 @@ exports.decodePrice = function (packedPrice) {
     direction = 'Sell';
     priceIndex = packedPrice - exports.minSellPricePacked;
   }
-  let zeroBasedMantissa = priceIndex % 900;
-  let zeroBasedExponent = Math.floor(priceIndex / 900 + 1e-6);
-  let mantissa = zeroBasedMantissa + 100;
-  let exponent = zeroBasedExponent + exports.minimumPriceExponent;
-  let mantissaDigits = '' + mantissa; // 100 - 999
+  var zeroBasedMantissa = priceIndex % 900;
+  var zeroBasedExponent = Math.floor(priceIndex / 900 + 1e-6);
+  var mantissa = zeroBasedMantissa + 100;
+  var exponent = zeroBasedExponent + exports.minimumPriceExponent;
+  var mantissaDigits = '' + mantissa; // 100 - 999
   var friendlyPricePart;
   if (exponent === -5) {
     friendlyPricePart = '0.00000' + mantissaDigits;
@@ -206,15 +208,15 @@ exports.parseFriendlyPricePart = function(direction, pricePart)  {
   if (pricePart === undefined) {
     return [{msg: 'is blank'}, undefined];
   }
-  let trimmedPricePart = pricePart.trim();
+  var trimmedPricePart = pricePart.trim();
   if (trimmedPricePart === '') {
     return [{msg: 'is blank'}, undefined];
   }
-  let looksLikeANumber = /^[0-9]*\.?[0-9]*$/.test(trimmedPricePart);
+  var looksLikeANumber = /^[0-9]*\.?[0-9]*$/.test(trimmedPricePart);
   if (!looksLikeANumber) {
     return [{msg: 'does not look like a regular number'}, undefined];
   }
-  let number = new BigNumber(NaN);
+  var number = new BigNumber(NaN);
   try {
     number = new BigNumber(trimmedPricePart);
   } catch (e) {
@@ -222,19 +224,19 @@ exports.parseFriendlyPricePart = function(direction, pricePart)  {
   if (number.isNaN() || !number.isFinite()) {
     return [{msg: 'does not look like a regular number'}, undefined];
   }
-  const minPrice = new BigNumber('0.000001');
-  const maxPrice = new BigNumber('999000');
+  var minPrice = new BigNumber('0.000001');
+  var maxPrice = new BigNumber('999000');
   if (number.lt(minPrice)) {
     return [{msg: 'is too small', suggestion: minPrice.toFixed()}, undefined];
   }
   if (number.gt(maxPrice)) {
     return [{msg: 'is too large', suggestion: maxPrice.toFixed()}, undefined];
   }
-  let currentPower = new BigNumber('1000000');
-  for (let exponent = 6; exponent >= -5; exponent--) {
+  var currentPower = new BigNumber('1000000');
+  for (var exponent = 6; exponent >= -5; exponent--) {
     if (number.gte(currentPower.times('0.1'))) {
-      let rawMantissa = number.div(currentPower);
-      let mantissa = rawMantissa.mul(1000);
+      var rawMantissa = number.div(currentPower);
+      var mantissa = rawMantissa.mul(1000);
       if (mantissa.isInteger()) {
         if (mantissa.lt(100) || mantissa.gt(999)) {
           return [{msg: 'has an unknown problem'}, undefined];
@@ -242,9 +244,9 @@ exports.parseFriendlyPricePart = function(direction, pricePart)  {
         return [undefined, [direction, mantissa.toNumber(), exponent]];
       } else {
         // round in favour of the order placer
-        let roundMode = (direction === 'Buy') ? BigNumber.ROUND_DOWN : BigNumber.ROUND_UP;
-        let roundMantissa = mantissa.round(0, roundMode);
-        let roundedNumber = roundMantissa.div(1000).mul(currentPower);
+        var roundMode = (direction === 'Buy') ? BigNumber.ROUND_DOWN : BigNumber.ROUND_UP;
+        var roundMantissa = mantissa.round(0, roundMode);
+        var roundedNumber = roundMantissa.div(1000).mul(currentPower);
         return [{msg: 'has too many significant figures', suggestion: roundedNumber.toFixed()}, undefined];
       }
     }
@@ -256,7 +258,7 @@ exports.parseFriendlyPricePart = function(direction, pricePart)  {
 // e.g. 'Buy @ 12.3' -> ['Buy', 123, 2]
 //
 exports.splitFriendlyPrice = function(price)  {
-  const invalidSplitPrice = ['Invalid', 0, 0];
+  var invalidSplitPrice = ['Invalid', 0, 0];
   if (!price.startsWith) {
     return invalidSplitPrice;
   }
@@ -271,7 +273,7 @@ exports.splitFriendlyPrice = function(price)  {
   } else {
     return invalidSplitPrice;
   }
-  let errorAndResult = exports.parseFriendlyPricePart(direction, pricePart);
+  var errorAndResult = exports.parseFriendlyPricePart(direction, pricePart);
   if (errorAndResult[0]) {
     return invalidSplitPrice;
   } else {
@@ -303,10 +305,18 @@ exports.encodeCntrAmount = function(friendlyAmount, decimals) {
   return exports.encodeAmount(friendlyAmount, exports.cntrDecimals);
 };
 
+exports.decodeRwrdAmount = function(amountWei) {
+  return exports.decodeAmount(amountWei, exports.rwrdDecimals);
+};
+
+exports.encodeRwrdAmount = function(friendlyAmount, decimals) {
+  return exports.encodeAmount(friendlyAmount, exports.rwrdDecimals);
+};
+
 exports.decodeOrderId = function(rawOrderId) {
   // pad to allow string ordering comparison
   // 128 bits needs 25 base36 digits
-  const padding = '0000000000000000000000';
+  var padding = '0000000000000000000000';
   return 'R' + (padding + rawOrderId.toString(36)).substr(-25);
 };
 
@@ -321,9 +331,9 @@ exports.encodeOrderId = function(friendlyOrderId) {
 
 // See generateEncodedOrderId below.
 exports.computeEncodedOrderId = function(date, randomHex) {
-  let padding = '000000000000000000000000';
-  let secondsSinceEpoch = parseInt(date.getTime() / 1000);
-  let hex =
+  var padding = '000000000000000000000000';
+  var secondsSinceEpoch = parseInt(date.getTime() / 1000);
+  var hex =
       (padding + secondsSinceEpoch.toString(16)).substr(-8)
     + (padding + randomHex).substr(-24);
   return new BigNumber(hex, 16);
@@ -338,8 +348,8 @@ exports.generateEncodedOrderId = function() {
   // So we:
   //  - use client seconds since epoch (32bit) * 2^96 + 96 bits of client randomness
   // TODO: errm, yes, this has Y2K38 bug
-  let date = new Date();
-  let fullUuidWithoutDashes = uuidv4().replace(/-/g, '');
+  var date = new Date();
+  var fullUuidWithoutDashes = uuidv4().replace(/-/g, '');
   return exports.computeEncodedOrderId(date, fullUuidWithoutDashes);
 };
 
@@ -352,10 +362,21 @@ exports.deliberatelyInvalidEncodedOrderId = function() {
 };
 
 exports.extractClientDateFromDecodedOrderId = function(friendlyOrderId) {
-  let encodedOrderId = exports.encodeOrderId(friendlyOrderId);
-  let multiplier = (new BigNumber(2)).toPower(96);
-  let datePartSeconds = encodedOrderId.div(multiplier).floor();
+  var encodedOrderId = exports.encodeOrderId(friendlyOrderId);
+  var multiplier = (new BigNumber(2)).toPower(96);
+  var datePartSeconds = encodedOrderId.div(multiplier).floor();
   return new Date(datePartSeconds.times(1000).toNumber());
+};
+
+// Suitable for use with getClientBalances().
+exports.decodeClientBalances = function (result) {
+  return {
+    exchangeBase: exports.decodeBaseAmount(result[0]),
+    exchangeCntr: exports.decodeCntrAmount(result[1]),
+    exchangeRwrd: exports.decodeRwrdAmount(result[2]),
+    approvedBase: exports.decodeBaseAmount(result[3]),
+    approvedRwrd: exports.decodeRwrdAmount(result[4])
+  };
 };
 
 // Suitable for use with walkClientOrders().

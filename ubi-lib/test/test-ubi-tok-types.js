@@ -1,3 +1,6 @@
+// Tests for the UbiTokTypes module which deals mostly with decoding/encoding exchange contract input/output.
+//
+
 var expect = require("chai").expect;
 var UbiTokTypes = require("../ubi-tok-types");
 

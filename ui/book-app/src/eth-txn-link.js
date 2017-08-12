@@ -1,18 +1,15 @@
-import React, { Component } from 'react';
-import { Button, Glyphicon } from 'react-bootstrap';
+import React from 'react';
+import { } from 'react-bootstrap';
 
 import ethLogo from './ethereum_icon.svg';
 
 class EthTxnLink extends React.Component {
 
-  constructor(props) {
-    super(props);
-  }
-
   computeBaseUrl = () => {
     if (this.props.networkName === "Ropsten Test Network") {
       return "https://ropsten.etherscan.io/tx/";
     }
+    // TODO - main net! something vaguely sensible for demo!
     return undefined;
   }
 

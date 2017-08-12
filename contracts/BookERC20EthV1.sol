@@ -11,7 +11,8 @@ contract ERC20 {
   event Approval(address indexed _owner, address indexed _spender, uint _value);
 }
 
-// Limit order book with an ERC20 token as base, and ETH as quoted.
+// UbiTok.io limit order book with an ERC20 token as base, ETH as quoted, and standard fees.
+// Copyright (c) Bonnag Limited. All Rights Reserved.
 //
 contract BookERC20EthV1 {
 
@@ -54,7 +55,7 @@ contract BookERC20EthV1 {
     MakerOnly
   }
 
-  // TODO - consider saving gas costs by using uint128 for monetary amounts in order storage?
+  // TODO - could make sizeBase, status and reasonCode uint128?
 
   struct Order {
     // these are immutable once placed:
@@ -68,9 +69,10 @@ contract BookERC20EthV1 {
     
     Status status;
     ReasonCode reasonCode;
-    uint executedBase;      // gross amount executed in base currency (before fee deduction)
-    uint executedCntr;      // gross amount executed in counter currency (before fee deduction)
-    uint fees;              // fees charged in base for a buy order, in counter for a sell order
+    uint128 executedBase;      // gross amount executed in base currency (before fee deduction)
+    uint128 executedCntr;      // gross amount executed in counter currency (before fee deduction)
+    uint128 feesBaseOrCntr;    // base for buy, cntr for sell
+    uint128 feesRwrd;
   }
   
   struct OrderChain {
@@ -87,19 +89,19 @@ contract BookERC20EthV1 {
     Deposit,
     Withdraw,
     TransferFrom,
-    Transfer,
-    Approve
+    Transfer
   }
 
-  enum BaseOrCntr {
+  enum BalanceType {
     Base,
-    Cntr
+    Cntr,
+    Rwrd
   }
 
   event ClientPaymentEvent(
     address indexed client,
     ClientPaymentEventType clientPaymentEventType,
-    BaseOrCntr baseOrCntr,
+    BalanceType balanceType,
     int clientBalanceDelta
   );
 
@@ -130,13 +132,14 @@ contract BookERC20EthV1 {
     uint amountBase
   );
 
-  // the base token (e.g. UBI)
+  // the base token (e.g. TEST)
   
   ERC20 baseToken;
   uint constant baseMinInitialSize = 100; // yes, far too small - testing only!
   // if following partial match, the remaning gets smaller than this, remove from book and refund:
   uint constant baseMinRemainingSize = 10; // yes, far too small - testing only!
   // even multiplied by 1000000 or divided by 0.000001 this fits in 2^127:
+  // TODO - but what if multiplied by feePpm?
   uint constant baseMaxSize = 10 ** 32;
 
   // the counter currency (ETH)
@@ -147,19 +150,26 @@ contract BookERC20EthV1 {
   // even multiplied by 1000000 or divided by 0.000001 this fits in 2^127:
   uint constant cntrMaxSize = 10 ** 32; // exclusive
 
-  // funds that belong to clients
+  // the reward token that can be used to pay fees (UBI)
+
+  ERC20 rwrdToken;
+
+  // used to convert ETH amount to reward tokens when paying fee with reward tokens
+  uint constant ethRwrdRate = 100;
+  
+  // funds that belong to clients (base, counter, and reward)
 
   mapping (address => uint) balanceBaseForClient;
   mapping (address => uint) balanceCntrForClient;
+  mapping (address => uint) balanceRwrdForClient;
 
   // fee charged on liquidity taken in parts-per-million
 
   uint constant feePpm = 500;
   
   // fees charged are given to:
-  // TODO - change name
-
-  address investorProxy;
+  
+  address feeCollector;
 
   // all orders ever created
   
@@ -225,37 +235,41 @@ contract BookERC20EthV1 {
 
   // Constructor.
   //
-  // Sets investorProxy to the creator. Creator needs to call init() to finish setup.
+  // Sets feeCollector to the creator. Creator needs to call init() to finish setup.
   //
   function BookERC20EthV1() {
     address creator = msg.sender;
-    investorProxy = creator;
+    feeCollector = creator;
   }
 
-  // "Public" Management - set address of base token.
+  // "Public" Management - set address of base and reward tokens.
   //
-  // Can only be done once (normally immediately after creation) by the investor proxy.
+  // Can only be done once (normally immediately after creation) by the fee collector.
   //
   // Used instead of a constructor to make deployment easier.
   //
-  function init(ERC20 _baseToken) public {
-    require(msg.sender == investorProxy);
+  function init(ERC20 _baseToken, ERC20 _rwrdToken) public {
+    require(msg.sender == feeCollector);
     require(address(baseToken) == 0);
     require(address(_baseToken) != 0);
+    require(address(rwrdToken) == 0);
+    require(address(_rwrdToken) != 0);
     // attempt to catch bad tokens:
     require(_baseToken.totalSupply() > 0);
     baseToken = _baseToken;
+    require(_rwrdToken.totalSupply() > 0);
+    rwrdToken = _rwrdToken;
   }
 
-  // "Public" Management - change investor proxy.
+  // "Public" Management - change fee collector
   //
-  // The new investor proxy only gets fees charged after this point.
+  // The new fee collector only gets fees charged after this point.
   //
-  function changeInvestorProxy(address newInvestorProxy) public {
-    address oldInvestorProxy = investorProxy;
-    require(msg.sender == oldInvestorProxy);
-    require(newInvestorProxy != oldInvestorProxy);
-    investorProxy = newInvestorProxy;
+  function changeFeeCollector(address newFeeCollector) public {
+    address oldFeeCollector = feeCollector;
+    require(msg.sender == oldFeeCollector);
+    require(newFeeCollector != oldFeeCollector);
+    feeCollector = newFeeCollector;
   }
   
   // Public Info View - what is being traded here, what are the limits?
@@ -264,7 +278,8 @@ contract BookERC20EthV1 {
       BookType _bookType,
       address _baseToken, uint _baseMinInitialSize,
       address _cntrToken, uint _cntrMinInitialSize,
-      uint _feePpm, address _investorProxy
+      uint _feePpm, address _feeCollector,
+      address _rwrdToken
     ) {
     return (
       BookType.ERC20EthV1,
@@ -273,34 +288,34 @@ contract BookERC20EthV1 {
       address(0),
       cntrMinInitialSize,
       feePpm,
-      investorProxy
+      feeCollector,
+      address(rwrdToken)
     );
   }
 
-  // Public Funds View - get balances held by contract on behalf of the client.
-  //
-  // Excludes funds in open orders.
-  //
-  function getClientBalances(address client) public constant returns (uint balanceBase, uint balanceCntr) {
-    return (balanceBaseForClient[client], balanceCntrForClient[client]);
-  }
-
   // Public Funds View - get balances held by contract on behalf of the client,
-  // as well as the client's token / on-chain balances.
+  // or balances approved for deposit but not yet claimed by the contract.
   //
   // Excludes funds in open orders.
   //
-  // Mostly to help a web ui get a consistent snapshot of balances.
+  // Helps a web ui get a consistent snapshot of balances.
   //
-  function getMoreClientBalances(address client) public constant returns (
-      uint bookBalanceBase, uint bookBalanceCntr,
-      uint approvedBalanceBase, uint approvedBalanceCntr,
-      uint chainBalanceBase, uint chainBalanceCntr
+  // It would be nice to return off-exchange balances too perhaps?
+  //
+  function getClientBalances(address client) public constant returns (
+      uint bookBalanceBase,
+      uint bookBalanceCntr,
+      uint bookBalanceRwrd,
+      uint approvedBalanceBase,
+      uint approvedBalanceRwrd
     ) {
+    address contractAddress = address(this);
     return (
-      balanceBaseForClient[client], balanceCntrForClient[client],
-      baseToken.allowance(client, address(this)), 0,
-      baseToken.balanceOf(client), client.balance
+      balanceBaseForClient[client],
+      balanceCntrForClient[client],
+      balanceRwrdForClient[client],
+      baseToken.allowance(client, contractAddress),
+      rwrdToken.allowance(client, contractAddress)
     );
   }
 
@@ -317,7 +332,7 @@ contract BookERC20EthV1 {
     // belt and braces
     assert(baseToken.allowance(client, book) == 0);
     balanceBaseForClient[client] += amountBase;
-    ClientPaymentEvent(client, ClientPaymentEventType.TransferFrom, BaseOrCntr.Base, int(amountBase));
+    ClientPaymentEvent(client, ClientPaymentEventType.TransferFrom, BalanceType.Base, int(amountBase));
   }
 
   // Public Funds Manipulation - withdraw base tokens (as a transfer).
@@ -330,41 +345,7 @@ contract BookERC20EthV1 {
     balanceBaseForClient[client] -= amountBase;
     // TODO - what about older ERC20 tokens that don't return bool?
     require(baseToken.transfer(client, amountBase));
-    ClientPaymentEvent(client, ClientPaymentEventType.Transfer, BaseOrCntr.Base, -int(amountBase));
-  }
-
-  // Public Funds Manipulation - approve client to spend their base tokens.
-  //
-  // This probably only makes sense when the client is a smart-contract -
-  // for deposits you want to tell the ERC20 token to approve the book ...
-  //
-  function approveBase(uint newAllowanceBase) public {
-    // TODO - check not outrageously large (overflow bugs)
-    address client = msg.sender;
-    address book = address(this);
-    uint oldAllowanceBase = baseToken.allowance(book, client);
-    uint amountBase;
-    if (newAllowanceBase > oldAllowanceBase) {
-      amountBase = newAllowanceBase - oldAllowanceBase;
-      require(amountBase <= balanceBaseForClient[client]);
-      balanceBaseForClient[client] -= amountBase;
-      // TODO - what about older ERC20 tokens that don't return bool?
-      require(baseToken.approve(client, newAllowanceBase));
-      // belt and braces
-      assert(baseToken.allowance(book, client) == newAllowanceBase);
-      ClientPaymentEvent(client, ClientPaymentEventType.Approve, BaseOrCntr.Base, -int(amountBase));
-    } else if (newAllowanceBase == oldAllowanceBase) {
-      return;
-    } else {
-      amountBase = oldAllowanceBase - newAllowanceBase;
-      // TODO - what about older ERC20 tokens that don't return bool?
-      // TODO - some ERC20 tokens only allow 0 <-> non-zero transitions
-      require(baseToken.approve(client, newAllowanceBase));
-      // belt and braces
-      assert(baseToken.allowance(book, client) == newAllowanceBase);
-      balanceBaseForClient[client] += amountBase;
-      ClientPaymentEvent(client, ClientPaymentEventType.Approve, BaseOrCntr.Base, int(amountBase));
-    }
+    ClientPaymentEvent(client, ClientPaymentEventType.Transfer, BalanceType.Base, -int(amountBase));
   }
 
   // Public Funds Manipulation - deposit counter currency (ETH).
@@ -374,7 +355,7 @@ contract BookERC20EthV1 {
     uint amountCntr = msg.value;
     require(amountCntr > 0);
     balanceCntrForClient[client] += amountCntr;
-    ClientPaymentEvent(client, ClientPaymentEventType.Deposit, BaseOrCntr.Cntr, int(amountCntr));
+    ClientPaymentEvent(client, ClientPaymentEventType.Deposit, BalanceType.Cntr, int(amountCntr));
   }
 
   // Public Funds Manipulation - withdraw counter currency (ETH).
@@ -386,7 +367,36 @@ contract BookERC20EthV1 {
     require(amountCntr <= balanceCntrForClient[client]);
     balanceCntrForClient[client] -= amountCntr;
     client.transfer(amountCntr);
-    ClientPaymentEvent(client, ClientPaymentEventType.Withdraw, BaseOrCntr.Cntr, -int(amountCntr));
+    ClientPaymentEvent(client, ClientPaymentEventType.Withdraw, BalanceType.Cntr, -int(amountCntr));
+  }
+
+  // Public Funds Manipulation - deposit previously-approved reward tokens.
+  // TODO - should caller specify amount here so we can check it matches allowance?
+  //
+  function transferFromRwrd() public {
+    address client = msg.sender;
+    address book = address(this);
+    uint amountRwrd = rwrdToken.allowance(client, book);
+    require(amountRwrd > 0);
+    // TODO - what about older ERC20 tokens that don't return bool?
+    require(rwrdToken.transferFrom(client, book, amountRwrd));
+    // belt and braces
+    assert(rwrdToken.allowance(client, book) == 0);
+    balanceRwrdForClient[client] += amountRwrd;
+    ClientPaymentEvent(client, ClientPaymentEventType.TransferFrom, BalanceType.Rwrd, int(amountRwrd));
+  }
+
+  // Public Funds Manipulation - withdraw base tokens (as a transfer).
+  //
+  function transferRwrd(uint amountRwrd) public {
+    // TODO - check not outrageously large (overflow bugs)
+    address client = msg.sender;
+    require(amountRwrd > 0);
+    require(amountRwrd <= balanceRwrdForClient[client]);
+    balanceRwrdForClient[client] -= amountRwrd;
+    // TODO - what about older ERC20 tokens that don't return bool?
+    require(rwrdToken.transfer(client, amountRwrd));
+    ClientPaymentEvent(client, ClientPaymentEventType.Transfer, BalanceType.Rwrd, -int(amountRwrd));
   }
 
   // Public Order View - get full details of an order.
@@ -395,10 +405,12 @@ contract BookERC20EthV1 {
   //
   function getOrder(uint128 orderId) public constant returns (
     address client, uint16 price, uint sizeBase, Terms terms,
-    Status status, ReasonCode reasonCode, uint executedBase, uint executedCntr, uint fees) {
+    Status status, ReasonCode reasonCode, uint executedBase, uint executedCntr,
+    uint feesBaseOrCntr, uint feesRwrd) {
     Order order = orderForOrderId[orderId];
     return (order.client, order.price, order.sizeBase, order.terms,
-            order.status, order.reasonCode, order.executedBase, order.executedCntr, order.fees);
+            order.status, order.reasonCode, order.executedBase, order.executedCntr,
+            order.feesBaseOrCntr, order.feesRwrd);
   }
 
   // Public Order View - get mutable details of an order.
@@ -406,9 +418,11 @@ contract BookERC20EthV1 {
   // If the orderId does not exist, status will be Unknown.
   //
   function getOrderState(uint128 orderId) public constant returns (
-    Status status, ReasonCode reasonCode, uint executedBase, uint executedCntr, uint fees) {
+    Status status, ReasonCode reasonCode, uint executedBase, uint executedCntr,
+    uint feesBaseOrCntr, uint feesRwrd) {
     Order order = orderForOrderId[orderId];
-    return (order.status, order.reasonCode, order.executedBase, order.executedCntr, order.fees);
+    return (order.status, order.reasonCode, order.executedBase, order.executedCntr,
+            order.feesBaseOrCntr, order.feesRwrd);
   }
   
   // Public Order View - enumerate all recent orders + all open orders for one client.
@@ -430,8 +444,8 @@ contract BookERC20EthV1 {
       address client, uint128 maybeLastOrderIdReturned, uint128 minClosedOrderIdCutoff
     ) public constant returns (
       uint128 orderId, uint16 price, uint sizeBase, Terms terms,
-      Status status, ReasonCode reasonCode, uint executedBase, uint executedCntr, uint fees
-    ) {
+      Status status, ReasonCode reasonCode, uint executedBase, uint executedCntr,
+      uint feesBaseOrCntr, uint feesRwrd) {
     if (maybeLastOrderIdReturned == 0) {
       orderId = mostRecentOrderIdForClient[client];
     } else {
@@ -445,7 +459,8 @@ contract BookERC20EthV1 {
       orderId = clientPreviousOrderIdBeforeOrderId[orderId];
     }
     return (orderId, order.price, order.sizeBase, order.terms,
-            order.status, order.reasonCode, order.executedBase, order.executedCntr, order.fees);
+            order.status, order.reasonCode, order.executedBase, order.executedCntr,
+            order.feesBaseOrCntr, order.feesRwrd);
   }
  
   // Internal Price Calculation - turn packed price into a friendlier unpacked price.
@@ -546,7 +561,7 @@ contract BookERC20EthV1 {
     require(client != 0 && orderId != 0 && orderForOrderId[orderId].client == 0);
     ClientOrderEvent(client, ClientOrderEventType.Create, orderId);
     orderForOrderId[orderId] =
-      Order(client, price, sizeBase, terms, Status.Unknown, ReasonCode.None, 0, 0, 0);
+      Order(client, price, sizeBase, terms, Status.Unknown, ReasonCode.None, 0, 0, 0, 0);
     uint128 previousMostRecentOrderIdForClient = mostRecentOrderIdForClient[client];
     mostRecentOrderIdForClient[client] = orderId;
     clientPreviousOrderIdBeforeOrderId[orderId] = previousMostRecentOrderIdForClient;
@@ -647,6 +662,42 @@ contract BookERC20EthV1 {
     }
   }
 
+  // TODO - document
+  function creditExecutedFundsLessFees(uint128 orderId, uint originalExecutedBase, uint originalExecutedCntr) internal {
+    Order order = orderForOrderId[orderId];
+    uint liquidityTakenBase = order.executedBase - originalExecutedBase;
+    uint liquidityTakenCntr = order.executedCntr - originalExecutedCntr;
+    // Normally we deduct the fee from the currency bought (base for buy, cntr for sell),
+    // however we also accept reward tokens from the reward balance if it covers the fee,
+    // with the reward amount converted from the ETH amount (the counter currency here)
+    // at a fixed exchange rate. TODO - use safe math / satisfy overflow safe.
+    uint feesRwrd = liquidityTakenCntr * feePpm / 1000000 * ethRwrdRate;
+    uint feesBaseOrCntr;
+    address client = order.client;
+    uint availRwrd = balanceRwrdForClient[client];
+    if (feesRwrd <= availRwrd) {
+      balanceRwrdForClient[client] = availRwrd - feesRwrd;
+      balanceRwrdForClient[feeCollector] = feesRwrd;
+      // need += because could have paid some fees earlier in NeedsGas situation
+      order.feesRwrd += uint128(feesRwrd);
+      if (isBuyPrice(order.price)) {
+        balanceBaseForClient[client] += liquidityTakenBase;
+      } else {
+        balanceCntrForClient[client] += liquidityTakenCntr;
+      }
+    } else if (isBuyPrice(order.price)) {
+      feesBaseOrCntr = liquidityTakenBase * feePpm / 1000000;
+      balanceBaseForClient[order.client] += (liquidityTakenBase - feesBaseOrCntr);
+      order.feesBaseOrCntr += uint128(feesBaseOrCntr);
+      balanceBaseForClient[feeCollector] += feesBaseOrCntr;
+    } else {
+      feesBaseOrCntr = liquidityTakenCntr * feePpm / 1000000;
+      balanceCntrForClient[order.client] += (liquidityTakenCntr - feesBaseOrCntr);
+      order.feesBaseOrCntr += uint128(feesBaseOrCntr);
+      balanceCntrForClient[feeCollector] += feesBaseOrCntr;
+    }
+  }
+
   // Internal Order Placement - process a created and sanity checked order.
   //
   // Used both for new orders and for gas topup.
@@ -656,33 +707,15 @@ contract BookERC20EthV1 {
 
     uint ourOriginalExecutedBase = order.executedBase;
     uint ourOriginalExecutedCntr = order.executedCntr;
+
     var (ourDirection,) = unpackPrice(order.price);
     uint theirPriceStart = (ourDirection == Direction.Buy) ? minSellPrice : maxBuyPrice;
     uint theirPriceEnd = computeOppositePrice(order.price);
    
     MatchStopReason matchStopReason =
       matchAgainstBook(orderId, theirPriceStart, theirPriceEnd, maxMatches);
-    
-    uint liquidityTaken;
-    uint fees;
-    if (isBuyPrice(order.price)) {
-      liquidityTaken = (order.executedBase - ourOriginalExecutedBase);
-      if (liquidityTaken > 0) {
-        // overflow safe since size capped at 2**127
-        fees = liquidityTaken * feePpm / 1000000;
-        balanceBaseForClient[order.client] += (liquidityTaken - fees);
-        order.fees += fees;
-        balanceBaseForClient[investorProxy] += fees;
-      }
-    } else {
-      liquidityTaken = (order.executedCntr - ourOriginalExecutedCntr);
-      if (liquidityTaken > 0) {
-        fees = liquidityTaken * feePpm / 1000000;
-        balanceCntrForClient[order.client] += (liquidityTaken - fees);
-        order.fees += fees;
-        balanceCntrForClient[investorProxy] += fees;
-      }
-    }
+
+    creditExecutedFundsLessFees(orderId, ourOriginalExecutedBase, ourOriginalExecutedCntr);
 
     if (order.terms == Terms.ImmediateOrCancel) {
       if (matchStopReason == MatchStopReason.Satisfied) {
@@ -886,8 +919,8 @@ contract BookERC20EthV1 {
         break;
       }
     }
-    ourOrder.executedBase = workingOurExecutedBase;
-    ourOrder.executedCntr = workingOurExecutedCntr;
+    ourOrder.executedBase = uint128(workingOurExecutedBase);
+    ourOrder.executedCntr = uint128(workingOurExecutedCntr);
     if (theirOrderId == 0) {
       orderChainForOccupiedPrice[theirPrice].firstOrderId = 0;
       orderChainForOccupiedPrice[theirPrice].lastOrderId = 0;
@@ -966,8 +999,8 @@ contract BookERC20EthV1 {
       Order storage theirOrder, uint128 theirOrderId, uint16 theirPrice, uint matchBase, uint matchCntr
     ) internal returns (bool theirsDead) {
     // they are a maker so no fees
-    theirOrder.executedBase += matchBase;
-    theirOrder.executedCntr += matchCntr;
+    theirOrder.executedBase += uint128(matchBase);
+    theirOrder.executedCntr += uint128(matchCntr);
     if (isBuyPrice(theirPrice)) {
       // they have bought base (using the counter they already paid when creating the order)
       balanceBaseForClient[theirOrder.client] += matchBase;
@@ -977,6 +1010,7 @@ contract BookERC20EthV1 {
     }
     if (theirOrder.executedBase >= theirOrder.sizeBase - baseMinRemainingSize) {
       refundUnmatchedAndFinish(theirOrderId, Status.Done, ReasonCode.None);
+      // TODO - hang on, we're not accounting for the refunded unmatched dust
       MarketOrderEvent(block.timestamp, theirOrderId, MarketOrderEventType.CompleteFill, theirPrice, matchBase);
       return true;
     } else {
@@ -989,7 +1023,7 @@ contract BookERC20EthV1 {
   //
   // Refund any unmatched funds in an order (based on executed vs size) and move to a final state.
   //
-  // The order is NOT removed from the book by this call.
+  // The order is NOT removed from the book by this call and no event is raised.
   //
   // No sanity checks are made - the caller must be sure the order has not already been refunded.
   //

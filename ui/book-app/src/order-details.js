@@ -1,22 +1,13 @@
 import React from 'react';
-import { Navbar, Nav, NavItem, Tab, Tabs, Well, Panel,
-         Grid, Row, Col, Table,
-         ButtonToolbar, Button, Glyphicon, 
-         FormGroup, FormControl, ControlLabel, HelpBlock, InputGroup,
-         Modal } from 'react-bootstrap';
+import { Table, Button, Modal } from 'react-bootstrap';
 
 import EthTxnLink from './eth-txn-link.js';
 
 import moment from 'moment';
 
 import UbiTokTypes from 'ubi-lib/ubi-tok-types.js';
-var BigNumber = UbiTokTypes.BigNumber;
 
 class OrderDetails extends React.Component {
-
-  constructor(props) {
-    super(props);
-  }
 
   // TODO - move these formatting things to some sort of shared helper class
 

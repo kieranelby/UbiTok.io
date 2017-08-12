@@ -12,11 +12,6 @@
   text-align: center
 }
 
-#productSelectForm {
-  /* for some reason navbar-form has 15px, but we want our product select on the left. */
-  padding-left: 0px;
-}
-
 #mid-price-box {
  margin-top: -14px; 
  margin-bottom: 6px;
@@ -42,4 +37,23 @@
 .tinyHex {
   font-size: 8pt;
   font-family: monospace;
+}
+
+.sk-spinner {
+  display: inline;
+  margin-left: 5px;
+}
+
+.line-scale > div {
+  height: 10px;
+}
+
+.capped-table {
+  max-height: 400px;
+  overflow: auto;
+}
+
+.capped-table-small {
+  max-height: 200px;
+  overflow: auto;
 }

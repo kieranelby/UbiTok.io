@@ -6,8 +6,7 @@ var TestToken = artifacts.require('TestToken.sol');
 
 var UbiTokTypes = require('../ubi-lib/ubi-tok-types.js');
 var BigNumber = UbiTokTypes.BigNumber;
-
-var ReferenceExchange = require('../reference/reference-exchange.js');
+var ReferenceExchange = require('../ubi-lib/reference-exchange.js');
 
 contract('BookERC20EthV1 - create order errors', function(accounts) {
   var packedBuyOnePointZero = UbiTokTypes.encodePrice('Buy @ 1.00');
@@ -105,7 +104,7 @@ contract('BookERC20EthV1 - ERC20 payments', function(accounts) {
       return BookERC20EthV1.deployed();
     }).then(function(instance) {
       uut = instance;
-      return uut.init(testToken.address);
+      return uut.init(testToken.address, testToken.address);
     }).then(function(junk) {
       return testToken.transfer(accounts[1], depositAmount, {from: accounts[0]});
     }).then(function(junk) {
@@ -135,7 +134,7 @@ function runReferenceExchange(clients, commands) {
   }
   for (var cmd of commands) {
     if (cmd[0] === 'Create') {
-      rx.createOrder(cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7]);
+      rx.createOrder(cmd[1], cmd[2], cmd[3], new BigNumber(cmd[4]), cmd[5], cmd[6], cmd[7]);
     } else if (cmd[0] === 'Cancel') {
       rx.cancelOrder(cmd[1], cmd[2]);
     } else if (cmd[0] === 'Continue') {
@@ -160,7 +159,7 @@ function buildScenario(accounts, commands, expectedOrders, expectedBalanceChange
     return TestToken.deployed();
   }).then(function(instance) {
     context.testToken = instance;
-    return context.uut.init(context.testToken.address);
+    return context.uut.init(context.testToken.address, context.testToken.address);
   });
   // Look ahead to figure out clients + orderIds involved
   var orderIds = new Set();

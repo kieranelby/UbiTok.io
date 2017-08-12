@@ -9,24 +9,56 @@ var BigNumber = require('bignumber.js');
 // same mistakes in both - but the code isn't an /exact/ port, the Solidity one aims
 // to minimise gas whereas in JS we can go for readability first).
 //
+// Until better tools emerge, it's much easier to measure code coverage in JS
+// than in Solidity.
+//
+// Note that unlike the real contract, we use friendly prices, orderIds,
+// and enum names throughout. We use wei-denominated sizes though.
+//
 function ReferenceExchange() {
   if (!(this instanceof ReferenceExchange)) {
     throw new Error("constructor used as function");
   }
+  this.bigZero = new BigNumber(0);
   this.balanceBaseForClient = {};
   this.balanceCntrForClient = {};
+  this.balanceRwrdForClient = {};
   this.orderForOrderId = {};
   this.orderChainForPrice = {};
-  this.baseMinRemainingSize = 10;
-  this.baseMinInitialSize = 100;
-  this.cntrMinInitialSize = 10000;
+  this.baseMinRemainingSize = new BigNumber('10');
+  this.baseMinInitialSize = new BigNumber('100');
+  this.baseMaxSize = new BigNumber('1e32');
+  this.cntrMinInitialSize = new BigNumber('10000');
+  this.cntrMaxSize = new BigNumber('1e32');
+  this.events = [];
 }
 module.exports = ReferenceExchange;
 
+ReferenceExchange.prototype.collectEvents = function() {
+  let events = this.events;
+  this.events = [];
+  return events;
+}
+
+ReferenceExchange.prototype._raiseEvent = function(event) {
+  this.events.push(event);
+}
+
+ReferenceExchange.prototype._getOrDflt = function(obj, key, dflt) {
+  if (obj.hasOwnProperty(key)) {
+    return obj[key];
+  } else {
+    return dflt;
+  }
+};
+
 ReferenceExchange.prototype.getClientBalances = function(client) {
   return [
-    this.balanceBaseForClient.hasOwnProperty(client) ? this.balanceBaseForClient[client] : 0,
-    this.balanceCntrForClient.hasOwnProperty(client) ? this.balanceCntrForClient[client] : 0
+    this._getOrDflt(this.balanceBaseForClient, client, this.bigZero),
+    this._getOrDflt(this.balanceCntrForClient, client, this.bigZero),
+    this._getOrDflt(this.balanceRwrdForClient, client, this.bigZero),
+    this.bigZero, // TODO - approvals
+    this.bigZero
   ];
 };
 
@@ -40,19 +72,42 @@ ReferenceExchange.prototype.depositCntrForTesting = function(client, amountCntr)
 
 ReferenceExchange.prototype._creditFundsBase = function(client, amountBase)  {
   if (!this.balanceBaseForClient.hasOwnProperty(client)) {
-    this.balanceBaseForClient[client] = 0;
+    this.balanceBaseForClient[client] = this.bigZero;
   }
-  this.balanceBaseForClient[client] += amountBase;
+  this.balanceBaseForClient[client] = this.balanceBaseForClient[client].add(amountBase);
 };
 
 ReferenceExchange.prototype._creditFundsCntr = function(client, amountCntr)  {
   if (!this.balanceCntrForClient.hasOwnProperty(client)) {
-    this.balanceCntrForClient[client] = 0;
+    this.balanceCntrForClient[client] = this.bigZero;
   }
-  this.balanceCntrForClient[client] += amountCntr;
+  this.balanceCntrForClient[client] = this.balanceCntrForClient[client].add(amountCntr);
+};
+
+ReferenceExchange.prototype.walkBook = function(fromPrice) {
+  let minBuyPrice = 'Buy @ 0.00000100';
+  let maxSellPrice = 'Sell @ 999000';
+  let endPrice = this._isBuyPrice(fromPrice) ? minBuyPrice : maxSellPrice;
+  var allPrices = this._priceRange(fromPrice, endPrice);
+  var price;
+  for (var i = 0; i < allPrices.length; i++) {
+    price = allPrices[i];
+    if (this.orderChainForPrice.hasOwnProperty(price)) {
+      var orderChain = this.orderChainForPrice[price];
+      var depth = this.bigZero;
+      var count = this.bigZero;
+      for (var order of orderChain) {
+        depth = depth.add(order.sizeBase.minus(order.executedBase));
+        count++;
+      }
+      return [price, depth, count];
+    }
+  }
+  return [endPrice, this.bigZero, this.bigZero];
 };
 
 // Follows the slightly weird convention used by walkBook
+// TODO - perhaps abstract book building to some separate class that calls walkBook, the real contract does not have this
 ReferenceExchange.prototype.getBook = function()  {
   var bidSide = [];
   var askSide = [];
@@ -63,11 +118,11 @@ ReferenceExchange.prototype.getBook = function()  {
     price = allPrices[i];
     if (this.orderChainForPrice.hasOwnProperty(price)) {
       var orderChain = this.orderChainForPrice[price];
-      var depth = 0.0;
-      var count = 0;
+      var depth = this.bigZero;
+      var count = this.bigZero;
       for (var order of orderChain) {
-        depth += (order.sizeBase - order.executedBase);
-        count++;
+        depth = depth.add(order.sizeBase.minus(order.executedBase));
+        count = count.add(1);
       }
       bidSide.push([price, depth, count]);
     }
@@ -77,11 +132,11 @@ ReferenceExchange.prototype.getBook = function()  {
     price = allPrices[i];
     if (this.orderChainForPrice.hasOwnProperty(price)) {
       var orderChain = this.orderChainForPrice[price];
-      var depth = 0.0;
-      var count = 0;
+      var depth = this.bigZero;
+      var count = this.bigZero;
       for (var order of orderChain) {
-        depth += (order.sizeBase - order.executedBase);
-        count++;
+        depth = depth.add(order.sizeBase.minus(order.executedBase));
+        count = count.add(1);
       }
       askSide.push([price, depth, count]);
     }
@@ -105,13 +160,13 @@ ReferenceExchange.prototype.createOrder = function(client, orderId, price, sizeB
     client: client,
     price: this._normalisePrice(price),
     sizeBase: sizeBase,
-    sizeCntr: 0,
+    sizeCntr: this.bigZero,
     terms: terms,
     status : 'Unknown',
     reasonCode: 'None',
-    executedBase : 0,
-    executedCntr : 0,
-    fees: 0
+    executedBase : this.bigZero,
+    executedCntr : this.bigZero,
+    fees: this.bigZero // TODO - out of date
   };
   this.orderForOrderId[orderId] = order;
   if (!this._isValidPrice(order.price)) {
@@ -119,13 +174,13 @@ ReferenceExchange.prototype.createOrder = function(client, orderId, price, sizeB
     order.reasonCode = 'InvalidPrice';
     return;
   }
-  if (sizeBase < this.baseMinInitialSize || sizeBase > 999999999999) {
+  if (sizeBase.lt(this.baseMinInitialSize) || sizeBase.gte(this.baseMaxSize)) {
     order.status = 'Rejected';
     order.reasonCode = 'InvalidSize';
     return;
   }
   var sizeCntr = this.computeAmountCntr(sizeBase, price);
-  if (sizeCntr < this.cntrMinInitialSize || sizeCntr > 999999999999) {
+  if (sizeCntr < this.cntrMinInitialSize || sizeCntr.gte(this.cntrMaxSize)) {
     order.status = 'Rejected';
     order.reasonCode = 'InvalidSize';
     return;
@@ -162,9 +217,15 @@ ReferenceExchange.prototype.cancelOrder = function(client, orderId)  {
     if (newOrderChain.length === 0) {
       delete this.orderChainForPrice[order.price];
     } else {
-      // TODO - raise events!
       this.orderChainForPrice[order.price] = newOrderChain;
     }
+    this._raiseEvent({
+      eventType: 'MarketOrderEvent',
+      orderId: orderId,
+      marketOrderEventType: 'Remove',
+      price: order.price,
+      amountBase: order.sizeBase.minus(order.executedBase)
+    });
   }
   this._refundUnmatchedAndFinish(order, 'Done', 'ClientCancel');
 };
@@ -335,27 +396,27 @@ ReferenceExchange.prototype.computeAmountCntr = function(amountBase, price)  {
   if (splitPrice[0] === 'Invalid') {
     throw("not a valid sided price: " + price);
   }
-  var result = new BigNumber(amountBase);
+  var result = amountBase;
   result = result.times(splitPrice[1]);
   result = result.times(new BigNumber('10').pow(splitPrice[2] - 3));
   result = result.truncated();
-  return result.toNumber();
+  return result;
 };
 
 ReferenceExchange.prototype._debitFundsForOrder = function(order)  {
   if (this._isBuyPrice(order.price)) {
     var availableCntr = this.getClientBalances(order.client)[1];
-    if (availableCntr < order.sizeCntr) {
+    if (availableCntr.lt(order.sizeCntr)) {
       return false;
     }
-    this.balanceCntrForClient[order.client] = availableCntr - order.sizeCntr;
+    this.balanceCntrForClient[order.client] = availableCntr.minus(order.sizeCntr);
     return true;
   } else {
     var availableBase = this.getClientBalances(order.client)[0];
-    if (availableBase < order.sizeBase) {
+    if (availableBase.lt(order.sizeBase)) {
       return false;
     }
-    this.balanceBaseForClient[order.client] = availableBase - order.sizeBase;
+    this.balanceBaseForClient[order.client] = availableBase.minus(order.sizeBase);
     return true;
   }
 };
@@ -371,17 +432,18 @@ ReferenceExchange.prototype._processOrder = function(order, maxMatches)  {
   }
   var theirPriceEnd = this.oppositePrice(order.price);
   var matchStopReason = this._matchAgainstBook(order, theirPriceStart, theirPriceEnd, maxMatches);
-  if (order.executedBase > ourOriginalExecutedBase) {
+  // TODO - pay fees with rwrd balance
+  if (order.executedBase.gt(ourOriginalExecutedBase)) {
     if (this._isBuyPrice(order.price)) {
-      var liquidityTakenBase = order.executedBase - ourOriginalExecutedBase;
-      var feesBase = Math.floor(liquidityTakenBase * 0.0005);
-      this._creditFundsBase(order.client, liquidityTakenBase - feesBase);
-      order.fees += feesBase;
+      var liquidityTakenBase = order.executedBase.minus(ourOriginalExecutedBase);
+      var feesBase = liquidityTakenBase.times(0.0005).floor();
+      this._creditFundsBase(order.client, liquidityTakenBase.minus(feesBase));
+      order.fees = order.fees.add(feesBase);
     } else {
-      var liquidityTakenCntr = order.executedCntr - ourOriginalExecutedCntr;
-      var feesCntr = Math.floor(liquidityTakenCntr * 0.0005);
-      this._creditFundsCntr(order.client, liquidityTakenCntr - feesCntr);
-      order.fees += feesCntr;
+      var liquidityTakenCntr = order.executedCntr.minus(ourOriginalExecutedCntr);
+      var feesCntr = liquidityTakenCntr.times(0.0005).floor();
+      this._creditFundsCntr(order.client, liquidityTakenCntr.minus(feesCntr));
+      order.fees = order.fees.add(feesCntr);
     }
   }
   if (order.terms === 'ImmediateOrCancel') {
@@ -430,9 +492,9 @@ ReferenceExchange.prototype._processOrder = function(order, maxMatches)  {
 
 ReferenceExchange.prototype._refundUnmatchedAndFinish = function(order, status, reasonCode) {
   if (this._isBuyPrice(order.price)) {
-    this._creditFundsCntr(order.client, order.sizeCntr - order.executedCntr);
+    this._creditFundsCntr(order.client, order.sizeCntr.minus(order.executedCntr));
   } else {
-    this._creditFundsBase(order.client, order.sizeBase - order.executedBase);
+    this._creditFundsBase(order.client, order.sizeBase.minus(order.executedBase));
   }
   order.status = status;
   order.reasonCode = reasonCode;
@@ -501,10 +563,10 @@ ReferenceExchange.prototype._matchWithOccupiedPrice = function(order, theirPrice
     this._matchWithTheirs(order, theirOrder);
     matchesLeft -= 1;
     // TODO - dust prevention
-    if (order.executedBase === order.sizeBase) {
+    if (order.executedBase.eq(order.sizeBase)) {
       matchStopReason = 'Satisfied';
     }
-    if (theirOrder.status != 'Open') {
+    if (theirOrder.status !== 'Open') {
       orderChain.splice(0, 1);
       if (orderChain.length === 0) {
         if (matchStopReason === 'None') {
@@ -530,19 +592,19 @@ ReferenceExchange.prototype._matchWithOccupiedPrice = function(order, theirPrice
 // for e.g. crediting our matched funds, updating status.
 //
 ReferenceExchange.prototype._matchWithTheirs = function(ourOrder, theirOrder)  {
-  var ourRemainingBase = ourOrder.sizeBase - ourOrder.executedBase;
-  var theirRemainingBase = theirOrder.sizeBase - theirOrder.executedBase;
+  var ourRemainingBase = ourOrder.sizeBase.minus(ourOrder.executedBase);
+  var theirRemainingBase = theirOrder.sizeBase.minus(theirOrder.executedBase);
   var matchBase;
-  if (ourRemainingBase < theirRemainingBase) {
+  if (ourRemainingBase.lt(theirRemainingBase)) {
     matchBase = ourRemainingBase;
   } else {
     matchBase = theirRemainingBase;
   }
   var matchCntr = this.computeAmountCntr(matchBase, theirOrder.price);
-  ourOrder.executedBase += matchBase;
-  ourOrder.executedCntr += matchCntr;
-  theirOrder.executedBase += matchBase;
-  theirOrder.executedCntr += matchCntr;
+  ourOrder.executedBase = ourOrder.executedBase.add(matchBase);
+  ourOrder.executedCntr = ourOrder.executedCntr.add(matchCntr);
+  theirOrder.executedBase = theirOrder.executedBase.add(matchBase);
+  theirOrder.executedCntr = theirOrder.executedCntr.add(matchCntr);
   if (this._isBuyPrice(theirOrder.price)) {
      // they have bought base (using the Cntr they already paid when creating the order)
      this._creditFundsBase(theirOrder.client, matchBase);
@@ -551,9 +613,25 @@ ReferenceExchange.prototype._matchWithTheirs = function(ourOrder, theirOrder)  {
      this._creditFundsCntr(theirOrder.client, matchCntr);
   }
   // TODO - dust prevention (need to refund it tho)
-  if (theirOrder.executedBase === theirOrder.sizeBase) {
+  if (theirOrder.executedBase.eq(theirOrder.sizeBase)) {
     theirOrder.status = 'Done';
     theirOrder.reasonCode = 'None';
+    // TODO - hang on, the event does not account for any refunded unmatched dust
+    this._raiseEvent({
+      eventType: 'MarketOrderEvent',
+      orderId: theirOrder.orderId,
+      marketOrderEventType: 'CompleteFill',
+      price: theirOrder.price,
+      amountBase: matchBase
+    });
+  } else {
+    this._raiseEvent({
+      eventType: 'MarketOrderEvent',
+      orderId: theirOrder.orderId,
+      marketOrderEventType: 'PartialFill',
+      price: theirOrder.price,
+      amountBase: matchBase
+    });
   }
 };
 
@@ -604,4 +682,11 @@ ReferenceExchange.prototype._enterOrder = function(order)  {
   }
   this.orderChainForPrice[order.price].push(order);
   order.status = 'Open';
+  this._raiseEvent({
+    eventType: 'MarketOrderEvent',
+    orderId: order.orderId,
+    marketOrderEventType: 'Add',
+    price: order.price,
+    amountBase: order.sizeBase.minus(order.executedBase)
+  });
 };

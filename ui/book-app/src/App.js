@@ -1,13 +1,14 @@
 import React, { Component } from 'react';
-import { Navbar, Nav, NavItem, Tab, Tabs, Well, Panel,
+import { Navbar, Nav, NavItem, NavDropdown, MenuItem, Tab, Tabs,
          Grid, Row, Col, Table,
          ButtonToolbar, Button, Glyphicon, 
          FormGroup, FormControl, ControlLabel, HelpBlock, InputGroup,
-         Modal } from 'react-bootstrap';
+         Tooltip, OverlayTrigger } from 'react-bootstrap';
+
 import update from 'immutability-helper';
+import moment from 'moment';
 
 import Spinner from 'react-spinkit';
-
 import logo from './ubitok-logo.svg';
 
 import BridgeStatus from './bridge-status.js';
@@ -15,30 +16,31 @@ import CreateOrder from './create-order.js';
 import SendingButton from './sending-button.js';
 import EthTxnLink from './eth-txn-link.js';
 import OrderDetails from './order-details.js';
+// TODO - move payment forms to seperate components
 
 import './App.css';
 
-import moment from 'moment';
-
-import Bridge from './bridge.js'
+import Bridge from './bridge.js';
+import DemoBridge from './demo-bridge.js';
 import UbiTokTypes from 'ubi-lib/ubi-tok-types.js';
-var BigNumber = UbiTokTypes.BigNumber;
+import UbiBooks from 'ubi-lib/ubi-books.js';
 
-// Work around for:
-// a) passing Nav props into a form element
-// b) nav dropdown not nicely defaulting to showing chosen item
-// c) layout problems if you put a form control straight into a nav
-function MyNavForm(props) {
-  return <form className="navbar-form" id={props.id}>{props.children}</form>
-}
+let BigNumber = UbiTokTypes.BigNumber;
 
 class App extends Component {
   constructor(props) {
     super(props);
 
-    this.bridge = new Bridge();
+    const bookInfo = UbiBooks.bookInfo[props.bookId];
+    const networkInfo = UbiBooks.networkInfo[bookInfo.networkId];
+    if (networkInfo.liveness === "DEMO") {
+      this.bridge = new DemoBridge(bookInfo, networkInfo);
+    } else {
+      this.bridge = new Bridge(bookInfo, networkInfo);
+    }
     this.lastBridgeStatus = this.bridge.getInitialStatus();
 
+    // TODO - move internal book to separate class
     // pricePacked -> [rawDepth, orderCount, blockNumber]
     this.internalBook = new Map();
     this.internalBookWalked = false;
@@ -55,33 +57,43 @@ class App extends Component {
       "bridgeStatus": this.bridge.getInitialStatus(),
 
       // what are we trading?
+      // e.g.
+      // symbol: "TEST/ETH",
+      // base: {
+      //   tradableType: "ERC20",
+      //   symbol: "TEST",
+      //   decimals: 18,
+      //   name: "Test Token",
+      //   address: "0x678c4cf3f4a26d607d0a0032d72fdc3b1e3f71f4",
+      //   minInitialSize: "0.01"
+      // },
+      // cntr: {
+      //   tradableType: "Ether",
+      //   symbol: "ETH",
+      //   decimals: 18,
+      //   name: "Ether",
+      //   minInitialSize: "0.001"
+      // },
+      // rwrd: {
+      //   tradableType: "ERC20",
+      //   symbol: "UBI",
+      //   decimals: 18,
+      //   name: "UbiTok Reward Token",
+      //   address: "0x678c4cf3f4a26d607d0a0032d72fdc3b1e3f71f4",
+      // }
 
-      "pairInfo": {
-        "symbol": "UBI/ETH",
-        "base": {
-          "tradableType": "ERC20",
-          "symbol": "UBI",
-          "name": "UbiTok.io",
-          "address": "", // TODO - need to fill in when network selected
-          "minInitialSize": "0.01"
-        },
-        "cntr": {
-          "tradableType": "Ether",
-          "symbol": "ETH",
-          "name": "Ether",
-          "minInitialSize": "0.001"
-        }
-      },
+      "pairInfo": bookInfo,
 
-      // how much money do we have where?
-      // all are pairs of [ base, counter ] where undefined = unknown
+      // how much money do we have where (in display units)?
+      // "" = unknown
+      // TODO - add off-exchange balances?
 
       "balances": {
-        "wallet": [undefined, undefined],
-        // e.g. if we have approved some of our ERC20 funds for the contract
-        // but not told the contract to transfer them to itself yet (fiddly!)
-        "approved": [undefined, undefined],
-        "exchange": [undefined, undefined]
+        exchangeBase: "",
+        exchangeCntr: "",
+        exchangeRwrd: "",
+        approvedBase: "",
+        approvedRwrd: ""
       },
 
       // which payment tab the user is on
@@ -121,10 +133,9 @@ class App extends Component {
       //
 
       "paymentHistory" : [
-
       ],
       
-      // the order book
+      // the "friendly" order book
 
       "book": {
         // have we finished walking the book initially?
@@ -179,7 +190,8 @@ class App extends Component {
       //
       
       "marketTrades": {
-      }
+      },
+      "marketTradesLoaded": false
     };
     this.bridge.subscribeStatus(this.handleStatusUpdate);
     window.setInterval(this.pollExchangeBalances, 3000);
@@ -312,7 +324,11 @@ class App extends Component {
     for (let event of events) {
       this.addMarketTradeFromEvent(event);
     }
-    // TODO - make loading spinner disappear
+    this.setState((prevState, props) => {
+      return {
+        marketTradesLoaded: update(prevState.marketTradesLoaded, {$set: true})
+      };
+    });
   }
 
   handleMarketEvent = (error, event) => {
@@ -483,25 +499,17 @@ class App extends Component {
   }
 
   pollExchangeBalances = () => {
-    this.bridge.getBalances((error, newClientBalances) => {
+    this.bridge.getExchangeBalances((error, newExchangeBalances) => {
       if (error) {
         console.log(error);
         return;
       }
       this.setState((prevState, props) => {
         return {
-          balances: update(prevState.balances, {
-            exchange: {$set: [newClientBalances[0], newClientBalances[1]]},
-            approved: {$set: [newClientBalances[2], newClientBalances[3]]},
-            wallet:   {$set: [newClientBalances[4], newClientBalances[5]]},
-          })
+          balances: update(prevState.balances, {$merge: newExchangeBalances})
         }
       });
     });
-  }
-
-  handleNavSelect = (e) => {
-    // TODO - load different page?
   }
 
   handleCreateOrderDirectionSelect = (key) => {
@@ -590,14 +598,14 @@ class App extends Component {
 
   handleModifyOrderCallback = (orderId, error, result) => {
     console.log('might have done something to order', orderId, error, result);
-    var existingOrder = this.state.myOrders[orderId];
+    // TODO - but what if someone does multiple cancels/continues ...
+    //var existingOrder = this.state.myOrders[orderId];
     if (error) {
       this.updateMyOrder(orderId, { modifyInProgress: undefined });
     } else {
       if (result.event === 'GotTxnHash') {
         // TODO - suppose should try to convey the txn hash for cancel/continue somehow
       } else if (result.event === 'Mined') {
-        // TODO - but what if someone does multiple cancels/continues ...
         this.updateMyOrder(orderId, { modifyInProgress: undefined });
         this.refreshOrder(orderId);
       }
@@ -779,6 +787,21 @@ class App extends Component {
       };
     });
   }
+
+  makeSimpleToolTip = (text) => {
+    return (
+      <Tooltip id="tooltip">{text}</Tooltip>
+    );
+  }
+  
+  // TODO - don't like this, rework nav to just use plain old links
+  handleTopNavSelect = (key) => {
+    if (key === "Home") {
+      window.open("https://ubitok.io/", "_blank");
+    } else if (key === "ViewBooks") {
+      window.open("https://ubitok.io/books.html", "_blank");
+    }
+  }
   
   render() {
     return (
@@ -789,19 +812,14 @@ class App extends Component {
           <Grid>
             <Row>
               <Navbar inverse>
-                <Nav>
-                  <MyNavForm id="productSelectForm">
-                    <FormGroup controlId="productSelect">
-                      <FormControl componentClass="select" placeholder="Choose book">
-                        <option value="UBI/ETH">Book: UBI/ETH</option>
-                      </FormControl>
-                    </FormGroup>
-                  </MyNavForm>
+                <Nav bsStyle="pills" onSelect={this.handleTopNavSelect}>
+                  <NavDropdown eventKey="Book" title={"Book: " + this.state.pairInfo.symbol} id="nav-dropdown">
+                    <MenuItem eventKey="ViewBooks">View All Books ...</MenuItem>
+                  </NavDropdown>
                 </Nav>
-                <Nav bsStyle="pills" activeKey={2} onSelect={this.handleNavSelect} pullRight>
-                  <NavItem eventKey={1} href="#">Home</NavItem>
-                  <NavItem eventKey={2} href="#">Exchange</NavItem>
-                  <NavItem eventKey={3} href="#">Help</NavItem>
+                <Nav bsStyle="pills" pullRight activeKey="Exchange" onSelect={this.handleTopNavSelect}>
+                  <NavItem eventKey="Home" href="#">Home</NavItem>
+                  <NavItem eventKey="Exchange" href="#">Exchange</NavItem>
                 </Nav>
               </Navbar>
             </Row>
@@ -848,38 +866,49 @@ class App extends Component {
                 <Table bordered condensed id="funds-table">
                   <tbody>
                     <tr>
-                      <th colSpan="2">
-                        {this.state.pairInfo.base.symbol}
+                      <td colSpan="2">
+                        <OverlayTrigger placement="top" overlay={this.makeSimpleToolTip("Your " + this.state.pairInfo.base.name + " funds held in the contract. Can be sold for " + this.state.pairInfo.cntr.symbol + " or withdrawn.")}>
+                          <span>
+                            {this.state.balances.exchangeBase}
+                            &nbsp;
+                            {this.state.pairInfo.base.symbol}
+                          </span>
+                        </OverlayTrigger>
                         <ButtonToolbar className="pull-right">
                           <Button bsStyle="primary" bsSize="xsmall" onClick={() => this.setState({paymentTabKey: "depositBase"})}>Deposit</Button>
                           <Button bsStyle="warning" bsSize="xsmall" onClick={() => this.setState({paymentTabKey: "withdrawBase"})}>Withdraw</Button>
                         </ButtonToolbar>
-                      </th>
+                      </td>
                     </tr>
                     <tr>
-                      <td style={{width:"50%"}}>Book Contract</td>
-                      <th>{this.state.balances.exchange[0]}</th>
-                    </tr>
-                    <tr>
-                      <td>Your Account</td>
-                      <td>{this.state.balances.wallet[0]}</td>
-                    </tr>
-                    <tr>
-                      <th colSpan="2">
-                        {this.state.pairInfo.cntr.symbol}
+                      <td colSpan="2">
+                        <OverlayTrigger placement="top" overlay={this.makeSimpleToolTip("Your " + this.state.pairInfo.cntr.name + " funds held in the contract. Can be used to buy " + this.state.pairInfo.base.symbol + " or withdrawn.")}>
+                          <span>
+                            {this.state.balances.exchangeCntr}
+                            &nbsp;
+                            {this.state.pairInfo.cntr.symbol}
+                          </span>
+                        </OverlayTrigger>
                         <ButtonToolbar className="pull-right">
                           <Button bsStyle="primary" bsSize="xsmall" onClick={() => this.setState({paymentTabKey: "depositCntr"})}>Deposit</Button>
                           <Button bsStyle="warning" bsSize="xsmall" onClick={() => this.setState({paymentTabKey: "withdrawCntr"})}>Withdraw</Button>
                         </ButtonToolbar>
-                      </th>
+                      </td>
                     </tr>
                     <tr>
-                      <td>Book Contract</td>
-                      <th>{this.state.balances.exchange[1]}</th>
-                    </tr>
-                    <tr>
-                      <td>Your Account</td>
-                      <td>{this.state.balances.wallet[1]}</td>
+                      <td colSpan="2">
+                        <OverlayTrigger placement="top" overlay={this.makeSimpleToolTip("Your " + this.state.pairInfo.rwrd.name + " funds held in the contract. Can be used to pay fees or withdrawn.")}>
+                          <span>
+                            {this.state.balances.exchangeRwrd}
+                            &nbsp;
+                            {this.state.pairInfo.rwrd.symbol}
+                          </span>
+                        </OverlayTrigger>
+                        <ButtonToolbar className="pull-right">
+                          <Button bsStyle="primary" bsSize="xsmall" onClick={() => this.setState({paymentTabKey: "depositRwrd"})}>Deposit</Button>
+                          <Button bsStyle="warning" bsSize="xsmall" onClick={() => this.setState({paymentTabKey: "withdrawRwrd"})}>Withdraw</Button>
+                        </ButtonToolbar>
+                      </td>
                     </tr>
                     { (this.state.paymentHistory.length > 0) ? (
                       <tr>
@@ -889,14 +918,14 @@ class App extends Component {
                     {this.state.paymentHistory.map((entry) =>
                       <tr key={entry.pmtId}>
                         <td>
-                          { (entry.pmtStatus === 'Sending') ? (
-                            <Spinner name="line-scale" color="purple"/>
-                          ) : null }
                           { (entry.pmtStatus === 'FailedSend') ? (
                             <Glyphicon glyph="warning-sign" text="failed to send payment" />
                           ) : null }
                           <EthTxnLink txnHash={entry.txnHash} networkName={this.state.bridgeStatus.chosenSupportedNetworkName} />
                           {entry.action}
+                          { (entry.pmtStatus === 'Sending') ? (
+                            <Spinner name="line-scale" color="purple"/>
+                          ) : null }
                         </td>
                         <td>
                           {entry.amount}
@@ -936,7 +965,7 @@ class App extends Component {
                           </HelpBlock>
                           <InputGroup>
                             <InputGroup.Addon>Current Approved Amount</InputGroup.Addon>
-                            <FormControl type="text" value={this.state.balances.approved[0]} readOnly onChange={()=>{}}/>
+                            <FormControl type="text" value={this.state.balances.approvedBase} readOnly onChange={()=>{}}/>
                             <InputGroup.Addon>{this.state.pairInfo.base.symbol}</InputGroup.Addon>
                           </InputGroup>
                           <HelpBlock>
@@ -1041,57 +1070,103 @@ class App extends Component {
                         </FormGroup>
                       </form>
                     </Tab.Pane>
+                    <Tab.Pane eventKey="depositRwrd">
+                      <p>
+                        <b>Deposit {this.state.pairInfo.rwrd.symbol}</b>
+                        <Button bsSize="xsmall" className="pull-right" bsStyle="default" onClick={() => this.setState({paymentTabKey: "none"})}>
+                          <Glyphicon glyph="remove" title="close" />
+                        </Button>
+                      </p>
+                      <p>
+                        Depositing/Withdrawing UBI Reward Tokens is not yet supported.
+                      </p>
+                    </Tab.Pane>
+                    <Tab.Pane eventKey="withdrawRwrd">
+                      <p>
+                        <b>Withdraw {this.state.pairInfo.rwrd.symbol}</b>
+                        <Button bsSize="xsmall" className="pull-right" bsStyle="default" onClick={() => this.setState({paymentTabKey: "none"})}>
+                          <Glyphicon glyph="remove" title="close" />
+                        </Button>
+                      </p>
+                      <p>
+                        Depositing/Withdrawing UBI Reward Tokens is not yet supported.
+                      </p>
+                    </Tab.Pane>
                   </Tab.Content>
                 </Tab.Container>
               </Col>
               <Col md={4}>
-                <h3>Order Book</h3>
-                  {/* TODO - need max-height */}
-                  <Table striped bordered condensed hover>
-                    <thead>
-                      <tr>
-                        <th>Ask Price</th>
-                        <th>Depth ({this.state.pairInfo.base.symbol})</th>
-                        <th>Count</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {this.state.book.asks.map((entry) =>
-                      <tr key={entry[0]}>
-                        <td className={this.chooseClassNameForPrice(entry[0])}>{entry[0]}</td>
-                        <td>{entry[1]}</td>
-                        <td>{entry[2]}</td>
-                      </tr>
-                      )}
-                    </tbody>
-                  </Table>
-                  <Table striped bordered condensed hover>
-                    <thead>
-                      <tr>
-                        <th>Bid Price</th>
-                        <th>Depth ({this.state.pairInfo.base.symbol})</th>
-                        <th>Count</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {this.state.book.bids.map((entry) =>
-                      <tr key={entry[0]}>
-                        <td className={this.chooseClassNameForPrice(entry[0])}>{entry[0]}</td>
-                        <td>{entry[1]}</td>
-                        <td>{entry[2]}</td>
-                      </tr>
-                      )}
-                    </tbody>
-                  </Table>
+                <h3>
+                  Order Book
+                   {this.state.book.isComplete ? undefined : (
+                    <Spinner name="line-scale" color="purple"/>
+                   )}
+                </h3>
+                  <div className="capped-table-small">
+                    <Table striped bordered condensed hover>
+                      <thead>
+                        <tr>
+                          <th>Ask Price</th>
+                          <th>Depth ({this.state.pairInfo.base.symbol})</th>
+                          <th>Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {this.state.book.asks.map((entry) =>
+                        <tr key={entry[0]}>
+                          <td className={this.chooseClassNameForPrice(entry[0])}>{entry[0]}</td>
+                          <td>{entry[1]}</td>
+                          <td>{entry[2]}</td>
+                        </tr>
+                        )}
+                        {this.state.book.isComplete && this.state.book.asks.length === 0 ? (
+                        <tr key="dummy">
+                          <td colSpan="3">No sell orders found - fancy making a market ...?</td>
+                        </tr>
+                        ) : undefined}
+                      </tbody>
+                    </Table>
+                  </div>
+                  <div className="capped-table-small">
+                    <Table striped bordered condensed hover>
+                      <thead>
+                        <tr>
+                          <th>Bid Price</th>
+                          <th>Depth ({this.state.pairInfo.base.symbol})</th>
+                          <th>Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {this.state.book.bids.map((entry) =>
+                        <tr key={entry[0]}>
+                          <td className={this.chooseClassNameForPrice(entry[0])}>{entry[0]}</td>
+                          <td>{entry[1]}</td>
+                          <td>{entry[2]}</td>
+                        </tr>
+                        )}
+                        {this.state.book.isComplete && this.state.book.bids.length === 0 ? (
+                        <tr key="dummy">
+                          <td colSpan="3">No buy orders found - fancy making a market ...?</td>
+                        </tr>
+                        ) : undefined}
+                      </tbody>
+                    </Table>
+                  </div>
               </Col>
               <Col md={4}>
-                <h3>Market Trades</h3>
+                <h3>
+                  Market Trades
+                   {this.state.marketTradesLoaded ? undefined : (
+                    <Spinner name="line-scale" color="purple"/>
+                   )}
+                </h3>
+                <div className="capped-table">
                   <Table striped bordered condensed hover>
                     <thead>
                       <tr>
                         <th>Time</th>
-                        <th>Maker Price</th>
-                        <th>Traded Size ({this.state.pairInfo.base.symbol})</th>
+                        <th>Price</th>
+                        <th>Size ({this.state.pairInfo.base.symbol})</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1105,8 +1180,14 @@ class App extends Component {
                         <td>{entry.executedBase}</td>
                       </tr>
                       )}
+                      {this.state.marketTradesLoaded && Object.keys(this.state.marketTrades).length === 0 ? (
+                      <tr key="dummy">
+                        <td colSpan="3">No recent market trades found.</td>
+                      </tr>
+                      ) : undefined}
                     </tbody>
                   </Table>
+                </div>
               </Col>
             </Row>
             <Row>
@@ -1114,16 +1195,22 @@ class App extends Component {
                 <h3>Create Order</h3>
                 {/* need tabs inline here - https://github.com/react-bootstrap/react-bootstrap/issues/1936 */}
                 <Tabs activeKey={this.state.createOrderDirection} onSelect={this.handleCreateOrderDirectionSelect} id="create-order-direction">
-                  <Tab eventKey="Buy" title={'BUY' + ' ' + this.state.pairInfo.base.symbol}>
+                  <Tab eventKey="Buy" title={'BUY ' + this.state.pairInfo.base.symbol}>
                     <CreateOrder direction="Buy" pairInfo={this.state.pairInfo} balances={this.state.balances} onPlace={this.handlePlaceOrder} />
                   </Tab>
-                  <Tab eventKey="Sell" title={'SELL' + ' ' + this.state.pairInfo.base.symbol}>
+                  <Tab eventKey="Sell" title={'SELL ' + this.state.pairInfo.base.symbol}>
                     <CreateOrder direction="Sell" pairInfo={this.state.pairInfo} balances={this.state.balances} onPlace={this.handlePlaceOrder} />
                   </Tab>
                 </Tabs>
               </Col>
               <Col md={8}>
-                <h3>My Orders</h3>
+                <h3>
+                   My Orders
+                   {this.state.myOrdersLoaded ? undefined : (
+                    <Spinner name="line-scale" color="purple"/>
+                   )}
+                </h3>
+                <div className="capped-table">
                   <Table striped bordered condensed hover>
                     <thead>
                       <tr>
@@ -1142,10 +1229,10 @@ class App extends Component {
                         <td className={this.chooseClassNameForPrice(entry.price)}>{entry.price}</td>
                         <td>{entry.sizeBase}</td>
                         <td>
+                          {entry.status + ((entry.modifyInProgress !== undefined) ? ' (' + entry.modifyInProgress + ')' : '')}
                           { (entry.status === 'Sending' || entry.modifyInProgress !== undefined) ? (
                           <Spinner name="line-scale" color="purple"/>
                           ) : undefined }
-                          {entry.status + ((entry.modifyInProgress !== undefined) ? ' (' + entry.modifyInProgress + ')' : '')}
                         </td>
                         <td>{this.formatBase(entry.rawExecutedBase)}</td>
                         <td>
@@ -1159,8 +1246,8 @@ class App extends Component {
                             </Button>
                             ) : undefined }
                             { (entry.status === 'NeedsGas') ? (
-                            <Button bsSize="xsmall" bsStyle="danger" onClick={() => this.handleClickContinueOrder(entry.orderId)}>
-                              <Glyphicon glyph="remove" title="cancel order" />
+                            <Button bsSize="xsmall" bsStyle="primary" onClick={() => this.handleClickContinueOrder(entry.orderId)}>
+                              <Glyphicon glyph="forward" title="continue placing order" />
                             </Button>
                             ) : undefined }
                             { (entry.status !== 'Open' && entry.status !== 'NeedsGas' && entry.status !== 'Sending') ? (
@@ -1172,15 +1259,21 @@ class App extends Component {
                         </td>
                       </tr>
                       )}
+                      {this.state.myOrdersLoaded && Object.keys(this.state.myOrders).length === 0 ? (
+                      <tr key="dummy">
+                        <td colSpan="6">No open or recent orders found for your address.</td>
+                      </tr>
+                      ) : undefined}
                     </tbody>
                   </Table>
-                  <OrderDetails
-                    show={this.state.showOrderInfo}
-                    onClose={this.handleOrderInfoCloseClick}
-                    myOrder={this.state.myOrders[this.state.orderInfoOrderId]} 
-                    pairInfo={this.state.pairInfo}
-                    chosenSupportedNetworkName={this.state.bridgeStatus.chosenSupportedNetworkName}
-                    clock={this.state.clock} />
+                </div>
+                <OrderDetails
+                  show={this.state.showOrderInfo}
+                  onClose={this.handleOrderInfoCloseClick}
+                  myOrder={this.state.myOrders[this.state.orderInfoOrderId]} 
+                  pairInfo={this.state.pairInfo}
+                  chosenSupportedNetworkName={this.state.bridgeStatus.chosenSupportedNetworkName}
+                  clock={this.state.clock} />
               </Col>
             </Row>
           </Grid>

@@ -1,10 +1,5 @@
 import React from 'react';
-import { Navbar, Nav, NavItem, Tab, Tabs, Well, Panel,
-         Grid, Row, Col, Table,
-         ButtonToolbar, Button, Glyphicon, 
-         FormGroup, FormControl, ControlLabel, HelpBlock, InputGroup,
-         Modal } from 'react-bootstrap';
-import update from 'immutability-helper';
+import { ButtonToolbar, FormGroup, FormControl, ControlLabel, HelpBlock, InputGroup } from 'react-bootstrap';
 
 import SendingButton from './sending-button.js';
 
@@ -61,8 +56,8 @@ class CreateOrder extends React.Component {
       return ['error', 'Amount is too large'];
     }
     if (this.props.direction === 'Sell') {
-      let availableBalance = this.props.balances.exchange[0];
-      if (availableBalance !== undefined && 
+      let availableBalance = this.props.balances.exchangeBase;
+      if (availableBalance !== "" && 
           rawAmountBase.gt(UbiTokTypes.encodeBaseAmount(availableBalance))) {
         return ['error', 'Your Book Contract ' + this.props.pairInfo.base.symbol +
           ' balance is too low, try a smaller amount or deposit more funds'];
@@ -91,7 +86,6 @@ class CreateOrder extends React.Component {
   }
 
   getCreateOrderCostValidationResult = () => {
-    let direction = 'Buy';
     let amount = this.state.amountBase;
     let pricePart = this.state.price;
     let cost = new BigNumber(NaN);
@@ -111,8 +105,8 @@ class CreateOrder extends React.Component {
     if (rawCost.gte('1e32')) {
       return ['error', 'Cost is too large, try a smaller amount'];
     }
-    let availableBalance = this.props.balances.exchange[1];
-    if (availableBalance !== undefined &&
+    let availableBalance = this.props.balances.exchangeCntr;
+    if (availableBalance !== "" &&
         rawCost.gt(UbiTokTypes.encodeCntrAmount(availableBalance))) {
       return ['error', 'Your Book Contract ' + this.props.pairInfo.cntr.symbol +
         ' balance is too low, try a smaller amount or deposit more funds' +
@@ -122,7 +116,6 @@ class CreateOrder extends React.Component {
   }
 
   getCreateOrderProceedsValidationResult = () => {
-    let direction = 'Sell';
     let amount = this.state.amountBase;
     let pricePart = this.state.price;
     let terms = this.state.terms;
@@ -255,7 +248,7 @@ class CreateOrder extends React.Component {
             <SendingButton bsStyle={(this.props.direction === 'Buy') ? "primary" : "warning"} onClick={this.handlePlaceOrder} text={'Place ' + this.props.direction + ' Order'} />
           </ButtonToolbar>
           <HelpBlock>
-            Please read our <a target="_blank" href="http://ubitok.io/trading-rules.html">Trading Rules</a> for help and terms.
+            Please read our <a target="_blank" href="http://ubitok.io/trading-rules.html" rel="noopener noreferrer">Trading Rules</a> for help and terms.
           </HelpBlock>
         </FormGroup>
       </div>
