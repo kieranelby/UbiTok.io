@@ -1,5 +1,6 @@
 {
   "name": "ubi-lib",
+  "version": "1.0.16",
   "description": "",
   "scripts": {
     "test": "./node_modules/.bin/mocha --reporter spec"
