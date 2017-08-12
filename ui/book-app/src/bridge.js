@@ -1,5 +1,5 @@
-import Web3 from 'web3';
-import UbiTokTypes from 'ubi-lib/ubi-tok-types.js';
+import Web3 from "web3";
+import UbiTokTypes from "ubi-lib/ubi-tok-types.js";
 
 class Bridge {
 
@@ -49,7 +49,7 @@ class Bridge {
   // TODO - this is very yucky
   getUpdatedStatus = () => {
     if (this.web3 === undefined && window.web3) {
-      console.log('found web3 provider');
+      console.log("found web3 provider");
       this.web3 = new Web3(window.web3.currentProvider);
     }
     let web3Present = this.web3 !== undefined && this.web3.hasOwnProperty("version");
@@ -59,14 +59,14 @@ class Bridge {
     } catch (e) {
       // in some web3 versions this seems to throw when the page is being closed?
       // treat as web3 not available yet?
-      console.log('problem using web3', e);
+      console.log("problem using web3", e);
     }
     if (networkId === undefined) {
       web3Present = false;
     }
     let unsupportedNetwork = web3Present && networkId !== this.targetNetworkInfo.networkId;
     if (web3Present && this.chosenSupportedNetworkId === undefined && !unsupportedNetwork) {
-      console.log('choosing network', networkId);
+      console.log("choosing network", networkId);
       this.chosenSupportedNetworkId = networkId;
       this.chosenSupportedNetworkName = this.targetNetworkInfo.name;
       const bookContractAbiArray = this.bookInfo.bookAbiArray;
@@ -84,7 +84,7 @@ class Bridge {
     var firstAccount = web3Present ? this.web3.eth.accounts[0] : undefined;
     let accountLocked = web3Present && firstAccount === undefined; // TODO - perhaps check not all zeroes?
     if (web3Present && this.chosenAccount === undefined && !accountLocked) {
-      console.log('choosing account', firstAccount);
+      console.log("choosing account", firstAccount);
       this.chosenAccount = firstAccount;
     }
     let accountChanged = web3Present && this.chosenAccount !== undefined && firstAccount !== this.chosenAccount;
@@ -126,7 +126,7 @@ class Bridge {
   checkCanMakePublicCalls = (callbackIfNot) => {
     let status = this.getUpdatedStatus();
     if (!status.canMakePublicCalls && callbackIfNot) {
-      window.setTimeout(function () { callbackIfNot(new Error('cannot make public calls: ' + status))}, 0);
+      window.setTimeout(function () { callbackIfNot(new Error("cannot make public calls: " + status));}, 0);
     }
     return status.canMakePublicCalls;
   }
@@ -136,7 +136,7 @@ class Bridge {
   checkCanMakeAccountCalls = (callbackIfNot) => {
     let status = this.getUpdatedStatus();
     if (!status.canMakeAccountCalls && callbackIfNot) {
-      window.setTimeout(function () { callbackIfNot(new Error('cannot make account calls: ' + status))}, 0);
+      window.setTimeout(function () { callbackIfNot(new Error("cannot make account calls: " + status));}, 0);
     }
     return status.canMakeAccountCalls;
   }
@@ -259,7 +259,7 @@ class Bridge {
     }
     let now = new Date();
     let recentCutoffDate = new Date(now.getTime() - 24 * 3600 * 1000);
-    let recentCutoffEncodedOrderId = UbiTokTypes.computeEncodedOrderId(recentCutoffDate, '0');
+    let recentCutoffEncodedOrderId = UbiTokTypes.computeEncodedOrderId(recentCutoffDate, "0");
     var encodedLastOrderId;
     if (!maybeLastOrderId) {
       encodedLastOrderId = UbiTokTypes.deliberatelyInvalidEncodedOrderId();
@@ -282,7 +282,7 @@ class Bridge {
     // TODO - come up with "clever" way of choosing maxMatches + gas
     var maxMatches;
     var gasAmount;
-    if (fmtTerms === 'MakerOnly') {
+    if (fmtTerms === "MakerOnly") {
       maxMatches = 0;
       gasAmount = 300000;
     } else {
@@ -406,7 +406,7 @@ class TransactionWatcher {
       return;
     }
     this.txnHash = result;
-    this.callback(undefined, {event: 'GotTxnHash', txnHash: this.txnHash});
+    this.callback(undefined, {event: "GotTxnHash", txnHash: this.txnHash});
     this._pollTxn();
   }
 
@@ -419,10 +419,10 @@ class TransactionWatcher {
       window.setTimeout(this._pollTxn, 3000);
       return;
     } else {
-      this.callback(undefined, {event: 'Mined'});
+      this.callback(undefined, {event: "Mined"});
     }
   }
 
 }
 
-export { Bridge as default }
+export { Bridge as default };

@@ -1,9 +1,9 @@
-import React from 'react';
-import { ButtonToolbar, FormGroup, FormControl, ControlLabel, HelpBlock, InputGroup } from 'react-bootstrap';
+import React from "react";
+import { ButtonToolbar, FormGroup, FormControl, ControlLabel, HelpBlock, InputGroup } from "react-bootstrap";
 
-import SendingButton from './sending-button.js';
+import SendingButton from "./sending-button.js";
 
-import UbiTokTypes from 'ubi-lib/ubi-tok-types.js';
+import UbiTokTypes from "ubi-lib/ubi-tok-types.js";
 var BigNumber = UbiTokTypes.BigNumber;
 
 class CreateOrder extends React.Component {
@@ -36,39 +36,40 @@ class CreateOrder extends React.Component {
   getCreateOrderAmountValidationResult = () => {
     let amount = this.state.amountBase;
     let terms = this.state.terms;
-    if (amount === undefined || amount.trim() === '') {
-      return ['error', 'Amount is blank'];
+    if (amount === undefined || amount.trim() === "") {
+      return ["error", "Amount is blank"];
     }
     let number = new BigNumber(NaN);
     try {
       number = new BigNumber(amount);
     } catch (e) {
+      // will detect NaN in next step
     }
     if (number.isNaN() || !number.isFinite()) {
-      return ['error', 'Amount does not look like a regular number'];
+      return ["error", "Amount does not look like a regular number"];
     }
     let rawAmountBase = UbiTokTypes.encodeBaseAmount(amount);
     let minInitialSize = this.props.pairInfo.base.minInitialSize;
     if (rawAmountBase.lt(UbiTokTypes.encodeBaseAmount(minInitialSize))) {
-      return ['error', 'Amount is too small, must be at least ' + minInitialSize];
+      return ["error", "Amount is too small, must be at least " + minInitialSize];
     }
-    if (rawAmountBase.gte('1e32')) {
-      return ['error', 'Amount is too large'];
+    if (rawAmountBase.gte("1e32")) {
+      return ["error", "Amount is too large"];
     }
-    if (this.props.direction === 'Sell') {
+    if (this.props.direction === "Sell") {
       let availableBalance = this.props.balances.exchangeBase;
       if (availableBalance !== "" && 
           rawAmountBase.gt(UbiTokTypes.encodeBaseAmount(availableBalance))) {
-        return ['error', 'Your Book Contract ' + this.props.pairInfo.base.symbol +
-          ' balance is too low, try a smaller amount or deposit more funds'];
+        return ["error", "Your Book Contract " + this.props.pairInfo.base.symbol +
+          " balance is too low, try a smaller amount or deposit more funds"];
       }
     }
     let helpMsg = undefined;
-    if (this.props.direction === 'Buy' && terms !== 'MakerOnly') {
-      let rawFees = rawAmountBase.times('0.0005');
-      helpMsg = 'A fee of up to ' + UbiTokTypes.decodeBaseAmount(rawFees) + ' ' + this.props.pairInfo.base.symbol + ' may be deducted';
+    if (this.props.direction === "Buy" && terms !== "MakerOnly") {
+      let rawFees = rawAmountBase.times("0.0005");
+      helpMsg = "A fee of up to " + UbiTokTypes.decodeBaseAmount(rawFees) + " " + this.props.pairInfo.base.symbol + " may be deducted";
     }
-    return ['success', helpMsg];
+    return ["success", helpMsg];
   }
 
   getCreateOrderPriceValidationResult = () => {
@@ -76,13 +77,13 @@ class CreateOrder extends React.Component {
     let errorAndResult = UbiTokTypes.parseFriendlyPricePart(this.props.direction, pricePart);
     if (errorAndResult[0]) {
       let error = errorAndResult[0];
-      let helpMsg = 'Price ' + error.msg;
+      let helpMsg = "Price " + error.msg;
       if (error.suggestion) {
-        helpMsg += '. Perhaps try ' + error.suggestion + '?';
+        helpMsg += ". Perhaps try " + error.suggestion + "?";
       }
-      return ['error', helpMsg];
+      return ["error", helpMsg];
     }
-    return ['success', undefined];
+    return ["success", undefined];
   }
 
   getCreateOrderCostValidationResult = () => {
@@ -92,27 +93,28 @@ class CreateOrder extends React.Component {
     try {
       cost = (new BigNumber(amount)).times(new BigNumber(pricePart));
     } catch (e) {
+      // will detect NaN in next step
     }
     if (cost.isNaN()) {
-      return [null, undefined, 'N/A'];
+      return [null, undefined, "N/A"];
     }
     let displayedCost = cost.toFixed();
     let rawCost = UbiTokTypes.encodeCntrAmount(cost);
     let minInitialSize = this.props.pairInfo.cntr.minInitialSize;
     if (rawCost.lt(UbiTokTypes.encodeCntrAmount(minInitialSize))) {
-      return ['error', 'Cost is too small (must be at least ' + minInitialSize + '), try a larger amount', displayedCost];
+      return ["error", "Cost is too small (must be at least " + minInitialSize + "), try a larger amount", displayedCost];
     }
-    if (rawCost.gte('1e32')) {
-      return ['error', 'Cost is too large, try a smaller amount'];
+    if (rawCost.gte("1e32")) {
+      return ["error", "Cost is too large, try a smaller amount"];
     }
     let availableBalance = this.props.balances.exchangeCntr;
     if (availableBalance !== "" &&
         rawCost.gt(UbiTokTypes.encodeCntrAmount(availableBalance))) {
-      return ['error', 'Your Book Contract ' + this.props.pairInfo.cntr.symbol +
-        ' balance is too low, try a smaller amount or deposit more funds' +
-        ' (remember to leave a little in your account for gas)', displayedCost];
+      return ["error", "Your Book Contract " + this.props.pairInfo.cntr.symbol +
+        " balance is too low, try a smaller amount or deposit more funds" +
+        " (remember to leave a little in your account for gas)", displayedCost];
     }
-    return ['success', undefined, displayedCost];
+    return ["success", undefined, displayedCost];
   }
 
   getCreateOrderProceedsValidationResult = () => {
@@ -123,30 +125,31 @@ class CreateOrder extends React.Component {
     try {
       proceeds = (new BigNumber(amount)).times(new BigNumber(pricePart));
     } catch (e) {
+      // will detect NaN in next step
     }
     if (proceeds.isNaN()) {
-      return [null, undefined, 'N/A'];
+      return [null, undefined, "N/A"];
     }
     let displayedProceeds = proceeds.toFixed();
     let rawProceeds = UbiTokTypes.encodeCntrAmount(proceeds);
     let minInitialSize = this.props.pairInfo.cntr.minInitialSize;
     if (rawProceeds.lt(UbiTokTypes.encodeCntrAmount(minInitialSize))) {
-      return ['error', 'Proceeds are too small (must be at least ' + minInitialSize + '), try a larger amount', displayedProceeds];
+      return ["error", "Proceeds are too small (must be at least " + minInitialSize + "), try a larger amount", displayedProceeds];
     }
-    if (rawProceeds.gte('1e32')) {
-      return ['error', 'Proceeds are too large, try a smaller amount'];
+    if (rawProceeds.gte("1e32")) {
+      return ["error", "Proceeds are too large, try a smaller amount"];
     }
     let helpMsg = undefined;
-    if (terms !== 'MakerOnly') {
-      let rawFees = rawProceeds.times('0.0005');
-      helpMsg = 'A fee of up to ' + UbiTokTypes.decodeCntrAmount(rawFees) + ' ' + this.props.pairInfo.cntr.symbol + ' may be deducted';
+    if (terms !== "MakerOnly") {
+      let rawFees = rawProceeds.times("0.0005");
+      helpMsg = "A fee of up to " + UbiTokTypes.decodeCntrAmount(rawFees) + " " + this.props.pairInfo.cntr.symbol + " may be deducted";
     }
-    return ['success', helpMsg, displayedProceeds];
+    return ["success", helpMsg, displayedProceeds];
   }
   
   getCreateOrderTermsValidationResult = () => {
     // TODO - check if e.g. maker only will take, or others will have crazee number of matches?
-    return ['success', undefined];
+    return ["success", undefined];
   }
   
   handleCreateOrderAmountBaseChange = (e) => {
@@ -176,10 +179,10 @@ class CreateOrder extends React.Component {
     });
   }
   
-  handlePlaceOrder = (e) => {
+  handlePlaceOrder = () => {
     // TODO - validation
     var orderId = UbiTokTypes.generateDecodedOrderId();
-    var price = this.props.direction + ' @ ' + this.state.price;
+    var price = this.props.direction + " @ " + this.state.price;
     var sizeBase = this.state.amountBase;
     var terms = this.state.terms;
     this.props.onPlace(orderId, price, sizeBase, terms);
@@ -214,24 +217,24 @@ class CreateOrder extends React.Component {
           </InputGroup>
           <HelpBlock>{this.getCreateOrderPriceValidationResult()[1]}</HelpBlock>
         </FormGroup>
-        { (this.props.direction === 'Buy') ? (
-        <FormGroup controlId="createOrderCost" validationState={this.getCreateOrderCostValidationResult()[0]}>
-          <InputGroup>
-            <InputGroup.Addon>Cost</InputGroup.Addon>
-            <FormControl type="text" value={this.getCreateOrderCostValidationResult()[2]} readOnly onChange={()=>{}}/>
-            <InputGroup.Addon>{this.props.pairInfo.cntr.symbol}</InputGroup.Addon>
-          </InputGroup>
-          <HelpBlock>{this.getCreateOrderCostValidationResult()[1]}</HelpBlock>
-        </FormGroup>
+        { (this.props.direction === "Buy") ? (
+          <FormGroup controlId="createOrderCost" validationState={this.getCreateOrderCostValidationResult()[0]}>
+            <InputGroup>
+              <InputGroup.Addon>Cost</InputGroup.Addon>
+              <FormControl type="text" value={this.getCreateOrderCostValidationResult()[2]} readOnly onChange={()=>{}}/>
+              <InputGroup.Addon>{this.props.pairInfo.cntr.symbol}</InputGroup.Addon>
+            </InputGroup>
+            <HelpBlock>{this.getCreateOrderCostValidationResult()[1]}</HelpBlock>
+          </FormGroup>
         ) : (
-        <FormGroup controlId="createOrderProceeds" validationState={this.getCreateOrderProceedsValidationResult()[0]}>
-          <InputGroup>
-            <InputGroup.Addon>Proceeds</InputGroup.Addon>
-            <FormControl type="text" value={this.getCreateOrderProceedsValidationResult()[2]} readOnly onChange={()=>{}}/>
-            <InputGroup.Addon>{this.props.pairInfo.cntr.symbol}</InputGroup.Addon>
-          </InputGroup>
-          <HelpBlock>{this.getCreateOrderProceedsValidationResult()[1]}</HelpBlock>
-        </FormGroup>
+          <FormGroup controlId="createOrderProceeds" validationState={this.getCreateOrderProceedsValidationResult()[0]}>
+            <InputGroup>
+              <InputGroup.Addon>Proceeds</InputGroup.Addon>
+              <FormControl type="text" value={this.getCreateOrderProceedsValidationResult()[2]} readOnly onChange={()=>{}}/>
+              <InputGroup.Addon>{this.props.pairInfo.cntr.symbol}</InputGroup.Addon>
+            </InputGroup>
+            <HelpBlock>{this.getCreateOrderProceedsValidationResult()[1]}</HelpBlock>
+          </FormGroup>
         ) }
         <FormGroup controlId="createOrderTerms" validationState={this.getCreateOrderTermsValidationResult()[0]}>
           <ControlLabel>Terms</ControlLabel>
@@ -245,7 +248,7 @@ class CreateOrder extends React.Component {
         </FormGroup>
         <FormGroup>
           <ButtonToolbar>
-            <SendingButton bsStyle={(this.props.direction === 'Buy') ? "primary" : "warning"} onClick={this.handlePlaceOrder} text={'Place ' + this.props.direction + ' Order'} />
+            <SendingButton bsStyle={(this.props.direction === "Buy") ? "primary" : "warning"} onClick={this.handlePlaceOrder} text={"Place " + this.props.direction + " Order"} />
           </ButtonToolbar>
           <HelpBlock>
             Please read our <a target="_blank" href="http://ubitok.io/trading-rules.html" rel="noopener noreferrer">Trading Rules</a> for help and terms.

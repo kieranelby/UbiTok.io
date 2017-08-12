@@ -1,5 +1,3 @@
-"use strict";
-
 var BigNumber = require('bignumber.js');
 
 // Javascript 'reference' implementation of the Solidity exchange contract.
@@ -14,6 +12,8 @@ var BigNumber = require('bignumber.js');
 //
 // Note that unlike the real contract, we use friendly prices, orderIds,
 // and enum names throughout. We use wei-denominated sizes though.
+//
+// Currently limiting ourselves to ES5 here - perhaps should transpile?
 //
 function ReferenceExchange() {
   if (!(this instanceof ReferenceExchange)) {
@@ -35,14 +35,14 @@ function ReferenceExchange() {
 module.exports = ReferenceExchange;
 
 ReferenceExchange.prototype.collectEvents = function() {
-  let events = this.events;
+  var events = this.events;
   this.events = [];
   return events;
-}
+};
 
 ReferenceExchange.prototype._raiseEvent = function(event) {
   this.events.push(event);
-}
+};
 
 ReferenceExchange.prototype._getOrDflt = function(obj, key, dflt) {
   if (obj.hasOwnProperty(key)) {
@@ -85,9 +85,9 @@ ReferenceExchange.prototype._creditFundsCntr = function(client, amountCntr)  {
 };
 
 ReferenceExchange.prototype.walkBook = function(fromPrice) {
-  let minBuyPrice = 'Buy @ 0.00000100';
-  let maxSellPrice = 'Sell @ 999000';
-  let endPrice = this._isBuyPrice(fromPrice) ? minBuyPrice : maxSellPrice;
+  var minBuyPrice = 'Buy @ 0.00000100';
+  var maxSellPrice = 'Sell @ 999000';
+  var endPrice = this._isBuyPrice(fromPrice) ? minBuyPrice : maxSellPrice;
   var allPrices = this._priceRange(fromPrice, endPrice);
   var price;
   for (var i = 0; i < allPrices.length; i++) {
@@ -96,9 +96,10 @@ ReferenceExchange.prototype.walkBook = function(fromPrice) {
       var orderChain = this.orderChainForPrice[price];
       var depth = this.bigZero;
       var count = this.bigZero;
-      for (var order of orderChain) {
+      for (var j = 0; j < orderChain.length; j++) {
+        var order = orderChain[j];
         depth = depth.add(order.sizeBase.minus(order.executedBase));
-        count++;
+        count = count.add(1);
       }
       return [price, depth, count];
     }
@@ -111,30 +112,34 @@ ReferenceExchange.prototype.walkBook = function(fromPrice) {
 ReferenceExchange.prototype.getBook = function()  {
   var bidSide = [];
   var askSide = [];
+  // why are we using ES5?
+  var allPrices, i, orderChain, depth, count, j;
   // ok, this is ludicrously inefficient
-  var allPrices = this._priceRange('Buy @ 999000', 'Buy @ 0.00000100');
+  allPrices = this._priceRange('Buy @ 999000', 'Buy @ 0.00000100');
   var price;
-  for (var i = 0; i < allPrices.length; i++) {
+  for (i = 0; i < allPrices.length; i++) {
     price = allPrices[i];
     if (this.orderChainForPrice.hasOwnProperty(price)) {
-      var orderChain = this.orderChainForPrice[price];
-      var depth = this.bigZero;
-      var count = this.bigZero;
-      for (var order of orderChain) {
+      orderChain = this.orderChainForPrice[price];
+      depth = this.bigZero;
+      count = this.bigZero;
+      for (j = 0; j < orderChain.length; j++) {
+        order = orderChain[j];
         depth = depth.add(order.sizeBase.minus(order.executedBase));
         count = count.add(1);
       }
       bidSide.push([price, depth, count]);
     }
   }
-  var allPrices = this._priceRange('Sell @ 0.00000100', 'Sell @ 999000');
-  for (var i = 0; i < allPrices.length; i++) {
+  allPrices = this._priceRange('Sell @ 0.00000100', 'Sell @ 999000');
+  for (i = 0; i < allPrices.length; i++) {
     price = allPrices[i];
     if (this.orderChainForPrice.hasOwnProperty(price)) {
-      var orderChain = this.orderChainForPrice[price];
-      var depth = this.bigZero;
-      var count = this.bigZero;
-      for (var order of orderChain) {
+      orderChain = this.orderChainForPrice[price];
+      depth = this.bigZero;
+      count = this.bigZero;
+      for (j = 0; j < orderChain.length; j++) {
+        order = orderChain[j];
         depth = depth.add(order.sizeBase.minus(order.executedBase));
         count = count.add(1);
       }
@@ -204,11 +209,11 @@ ReferenceExchange.prototype.cancelOrder = function(client, orderId)  {
     return;
   }
   if (order.status === 'Open') {
-    let orderChain = this.orderChainForPrice[order.price];
+    var orderChain = this.orderChainForPrice[order.price];
     if (!orderChain) {
       throw new Error('assertion broken - must be a chain for price of open order');
     }
-    let newOrderChain = orderChain.filter((v) => {
+    var newOrderChain = orderChain.filter(function(v) {
       return v.orderId !== orderId;
     });
     if (newOrderChain.length === orderChain.length) {
@@ -260,15 +265,15 @@ ReferenceExchange.prototype._parseFriendlyPricePart = function(direction, priceP
   if (pricePart === undefined) {
     return [{msg: 'is blank'}, undefined];
   }
-  let trimmedPricePart = pricePart.trim();
+  var trimmedPricePart = pricePart.trim();
   if (trimmedPricePart === '') {
     return [{msg: 'is blank'}, undefined];
   }
-  let looksLikeANumber = /^[0-9]*\.?[0-9]*$/.test(trimmedPricePart);
+  var looksLikeANumber = /^[0-9]*\.?[0-9]*$/.test(trimmedPricePart);
   if (!looksLikeANumber) {
     return [{msg: 'does not look like a regular number'}, undefined];
   }
-  let number = new BigNumber(NaN);
+  var number = new BigNumber(NaN);
   try {
     number = new BigNumber(trimmedPricePart);
   } catch (e) {
@@ -276,19 +281,19 @@ ReferenceExchange.prototype._parseFriendlyPricePart = function(direction, priceP
   if (number.isNaN() || !number.isFinite()) {
     return [{msg: 'does not look like a regular number'}, undefined];
   }
-  const minPrice = new BigNumber('0.000001');
-  const maxPrice = new BigNumber('999000');
+  var minPrice = new BigNumber('0.000001');
+  var maxPrice = new BigNumber('999000');
   if (number.lt(minPrice)) {
     return [{msg: 'is too small', suggestion: minPrice.toFixed()}, undefined];
   }
   if (number.gt(maxPrice)) {
     return [{msg: 'is too large', suggestion: maxPrice.toFixed()}, undefined];
   }
-  let currentPower = new BigNumber('1000000');
-  for (let exponent = 6; exponent >= -5; exponent--) {
+  var currentPower = new BigNumber('1000000');
+  for (var exponent = 6; exponent >= -5; exponent--) {
     if (number.gte(currentPower.times('0.1'))) {
-      let rawMantissa = number.div(currentPower);
-      let mantissa = rawMantissa.mul(1000);
+      var rawMantissa = number.div(currentPower);
+      var mantissa = rawMantissa.mul(1000);
       if (mantissa.isInteger()) {
         if (mantissa.lt(100) || mantissa.gt(999)) {
           return [{msg: 'has an unknown problem'}, undefined];
@@ -296,21 +301,21 @@ ReferenceExchange.prototype._parseFriendlyPricePart = function(direction, priceP
         return [undefined, [direction, mantissa.toNumber(), exponent]];
       } else {
         // round in favour of the order placer
-        let roundMode = (direction === 'Buy') ? BigNumber.ROUND_DOWN : BigNumber.ROUND_UP;
-        let roundMantissa = mantissa.round(0, roundMode);
-        let roundedNumber = roundMantissa.div(1000).mul(currentPower);
+        var roundMode = (direction === 'Buy') ? BigNumber.ROUND_DOWN : BigNumber.ROUND_UP;
+        var roundMantissa = mantissa.round(0, roundMode);
+        var roundedNumber = roundMantissa.div(1000).mul(currentPower);
         return [{msg: 'has too many significant figures', suggestion: roundedNumber.toFixed()}, undefined];
       }
     }
     currentPower = currentPower.times('0.1');
   }
   return [{msg: 'has an unknown problem'}, undefined];
-}
+};
 
 // e.g. 'Buy @ 12.3' -> ['Buy', 123, 2]
 //
 ReferenceExchange.prototype._splitPrice = function(price)  {
-  const invalidSplitPrice = ['Invalid', 0, 0];
+  var invalidSplitPrice = ['Invalid', 0, 0];
   if (!price.startsWith) {
     return invalidSplitPrice;
   }
@@ -325,7 +330,7 @@ ReferenceExchange.prototype._splitPrice = function(price)  {
   } else {
     return invalidSplitPrice;
   }
-  let errorAndResult = this._parseFriendlyPricePart(direction, pricePart);
+  var errorAndResult = this._parseFriendlyPricePart(direction, pricePart);
   if (errorAndResult[0]) {
     return invalidSplitPrice;
   } else {
@@ -507,7 +512,7 @@ ReferenceExchange.prototype._matchAgainstBook = function(order, theirPriceStart,
   for (var i = 0; i < theirPrices.length; i++) {
     var theirPrice = theirPrices[i];
     if (this.orderChainForPrice.hasOwnProperty(theirPrice)) {
-      var result = this._matchWithOccupiedPrice(order, theirPrice, matchesLeft)
+      var result = this._matchWithOccupiedPrice(order, theirPrice, matchesLeft);
       var removedLastAtPrice = result[0];
       matchesLeft = result[1];
       matchStopReason = result[2];
@@ -642,31 +647,32 @@ ReferenceExchange.prototype._priceRange = function(priceStart, priceEnd)  {
   if (splitPriceStart[0] !== splitPriceEnd[0]) {
     throw new Error('mixed directions not supported');
   }
+  var e, mStart, mEnd, m;
   if (splitPriceStart[0] === 'Buy') {
-    for (var e = splitPriceStart[2]; e >= splitPriceEnd[2]; e--) {
-      var mStart = 999;
-      var mEnd = 100;
+    for (e = splitPriceStart[2]; e >= splitPriceEnd[2]; e--) {
+      mStart = 999;
+      mEnd = 100;
       if (e === splitPriceStart[2]) {
         mStart = splitPriceStart[1];
       }
       if (e === splitPriceEnd[2]) {
         mEnd = splitPriceEnd[1];
       }
-      for (var m = mStart; m >= mEnd; m--) {
+      for (m = mStart; m >= mEnd; m--) {
         prices.push(this._makePrice(splitPriceStart[0], m, e));
       }
     }
   } else if (splitPriceStart[0] === 'Sell') {
-    for (var e = splitPriceStart[2]; e <= splitPriceEnd[2]; e++) {
-      var mStart = 100;
-      var mEnd = 999;
+    for (e = splitPriceStart[2]; e <= splitPriceEnd[2]; e++) {
+      mStart = 100;
+      mEnd = 999;
       if (e === splitPriceStart[2]) {
         mStart = splitPriceStart[1];
       }
       if (e === splitPriceEnd[2]) {
         mEnd = splitPriceEnd[1];
       }
-      for (var m = mStart; m <= mEnd; m++) {
+      for (m = mStart; m <= mEnd; m++) {
         prices.push(this._makePrice(splitPriceStart[0], m, e));
       }
     }

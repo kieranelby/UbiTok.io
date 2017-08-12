@@ -1,5 +1,5 @@
-import React from 'react';
-import { Button, Glyphicon } from 'react-bootstrap';
+import React from "react";
+import { Button, Glyphicon } from "react-bootstrap";
 
 class SendingButton extends React.Component {
 
@@ -35,4 +35,4 @@ class SendingButton extends React.Component {
   }
 }
 
-export { SendingButton as default }
+export { SendingButton as default };

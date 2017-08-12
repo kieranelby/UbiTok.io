@@ -1,7 +1,7 @@
-import React from 'react';
-import { } from 'react-bootstrap';
+import React from "react";
+import { } from "react-bootstrap";
 
-import ethLogo from './ethereum_icon.svg';
+import ethLogo from "./ethereum_icon.svg";
 
 class EthTxnLink extends React.Component {
 
@@ -28,4 +28,4 @@ class EthTxnLink extends React.Component {
   }
 }
 
-export { EthTxnLink as default }
+export { EthTxnLink as default };

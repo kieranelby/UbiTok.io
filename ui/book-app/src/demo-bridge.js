@@ -1,5 +1,5 @@
-import UbiTokTypes from 'ubi-lib/ubi-tok-types.js';
-import ReferenceExchange from 'ubi-lib/reference-exchange.js';
+import UbiTokTypes from "ubi-lib/ubi-tok-types.js";
+import ReferenceExchange from "ubi-lib/reference-exchange.js";
 let BigNumber = UbiTokTypes.BigNumber;
 
 class DemoBridge {
@@ -26,7 +26,27 @@ class DemoBridge {
 
     // TODO - set up simulated market history
     // TODO - set up simulated market actors
-
+    let actorAccount = '0xDemoActor1';
+    this.rx.depositBaseForTesting(actorAccount, UbiTokTypes.encodeBaseAmount("10000"));
+    this.rx.depositCntrForTesting(actorAccount, UbiTokTypes.encodeCntrAmount("1000"));
+    this.rx.createOrder(
+      actorAccount,
+      UbiTokTypes.generateDecodedOrderId(),
+      "Buy @ 0.0120",
+      UbiTokTypes.encodeBaseAmount("1000"),
+      "MakerOnly",
+      0
+    );
+    this.rx.createOrder(
+      actorAccount,
+      UbiTokTypes.generateDecodedOrderId(),
+      "Sell @ 0.0175",
+      UbiTokTypes.encodeBaseAmount("2000"),
+      "MakerOnly",
+      0
+    );
+    this.rx.collectEvents();
+    
     this.rx.depositBaseForTesting(this.chosenAccount, UbiTokTypes.encodeBaseAmount("10000"));
     this.rx.depositCntrForTesting(this.chosenAccount, UbiTokTypes.encodeCntrAmount("1000"));
 
@@ -45,7 +65,7 @@ class DemoBridge {
         errors.push(e);
       }
       try {
-        txn.callback(undefined, {event:'Mined'});
+        txn.callback(undefined, {event:"Mined"});
       } catch (e) {
         errors.push(e);
       }
@@ -59,7 +79,7 @@ class DemoBridge {
     for (let event of events) {
       event.blockNumber = this.blockNumber;
       event.logIndex = logIndex++;
-      if (event.eventType === 'MarketOrderEvent') {
+      if (event.eventType === "MarketOrderEvent") {
         this._deliverFutureMarketEvent(event);
       }
     }
@@ -74,7 +94,7 @@ class DemoBridge {
     });
     this.txnCounter++;
     this._scheduleConfirmTxn(() => {
-      callback(undefined, {event: 'GotTxnHash', txnHash: '0xDemoTxn' + this.txnCounter});
+      callback(undefined, {event: "GotTxnHash", txnHash: "0xDemoTxn" + this.txnCounter});
     });
   }
 
@@ -148,12 +168,12 @@ class DemoBridge {
   }
 
   // Request callback with client's balances (if available).
-  // Callback fn should take (error, result) where result is as UbiTokTypes.decodeMoreClientBalances().
+  // Callback fn should take (error, result) where result is as UbiTokTypes.decodeClientBalances().
   // Returns nothing useful.
   getExchangeBalances = (callback) => {
     this._scheduleRead(() => {
       const rawBalances = this.rx.getClientBalances(this.chosenAccount);
-      const fmtBalances = UbiTokTypes.decodeMoreClientBalances(rawBalances);
+      const fmtBalances = UbiTokTypes.decodeClientBalances(rawBalances);
       callback(undefined, fmtBalances);
     });
   }
@@ -239,7 +259,7 @@ class DemoBridge {
     // TODO - come up with "clever" way of choosing maxMatches + gas
     var maxMatches;
     var gasAmount;
-    if (fmtTerms === 'MakerOnly') {
+    if (fmtTerms === "MakerOnly") {
       maxMatches = 0;
       gasAmount = 300000;
     } else {
@@ -342,4 +362,4 @@ class DemoBridge {
 
 }
 
-export { DemoBridge as default }
+export { DemoBridge as default };

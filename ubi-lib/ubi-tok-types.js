@@ -1,4 +1,7 @@
 // Conversion functions for talking to the BookERC20EthV1 contract.
+//
+// Currently limiting ourselves to ES5 here - perhaps should transpile?
+//
 
 var BigNumber = require('bignumber.js');
 var uuidv4 = require('uuid/v4');
@@ -56,7 +59,7 @@ function encodeEnum(enumNamedValues, namedValue) {
     throw new Error("unknown name " + namedValue + " expected one of " + enumNamedValues);
   }
   return idx;
-};
+}
 
 function decodeEnum(enumNamedValues, encodedValue) {
   if (encodedValue.toNumber) encodedValue = encodedValue.toNumber();
@@ -64,7 +67,7 @@ function decodeEnum(enumNamedValues, encodedValue) {
     throw new Error("unknown encodedValue " + encodedValue + " expected one of " + enumNamedValues);
   }
   return enumNamedValues[encodedValue];
-};
+}
 
 exports.BigNumber = BigNumber;
 exports.uuidv4 = uuidv4;
@@ -81,7 +84,7 @@ exports.oppositeEncodedDirection = function(encodedDirection) {
   } else if (encodedDirection === 2) {
     return 1;
   } else {
-    throw new Error("unknown encodedDirection " + encodedDirection)
+    throw new Error("unknown encodedDirection " + encodedDirection);
   }
 };
 
@@ -144,7 +147,7 @@ exports.encodePrice = function (friendlyPrice) {
 //
 exports.decodePrice = function (packedPrice) {
   if (packedPrice.toNumber) {
-    packedPrice = packedPrice.toNumber()
+    packedPrice = packedPrice.toNumber();
   }
   var direction;
   var priceIndex;
@@ -253,7 +256,7 @@ exports.parseFriendlyPricePart = function(direction, pricePart)  {
     currentPower = currentPower.times('0.1');
   }
   return [{msg: 'has an unknown problem'}, undefined];
-}
+};
 
 // e.g. 'Buy @ 12.3' -> ['Buy', 123, 2]
 //
@@ -334,8 +337,8 @@ exports.computeEncodedOrderId = function(date, randomHex) {
   var padding = '000000000000000000000000';
   var secondsSinceEpoch = parseInt(date.getTime() / 1000);
   var hex =
-      (padding + secondsSinceEpoch.toString(16)).substr(-8)
-    + (padding + randomHex).substr(-24);
+      (padding + secondsSinceEpoch.toString(16)).substr(-8) +
+      (padding + randomHex).substr(-24);
   return new BigNumber(hex, 16);
 };
 
