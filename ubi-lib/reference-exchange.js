@@ -19,10 +19,20 @@ function ReferenceExchange() {
   if (!(this instanceof ReferenceExchange)) {
     throw new Error("constructor used as function");
   }
+
   this.bigZero = new BigNumber(0);
+
   this.balanceBaseForClient = {};
   this.balanceCntrForClient = {};
   this.balanceRwrdForClient = {};
+
+  // not really part of the exchange but doesn't seem worth having separate reference tokens
+  this.approvedBaseForClient = {};
+  this.approvedRwrdForClient = {};
+  this.ownBaseForClient = {};
+  this.ownCntrForClient = {};
+  this.ownRwrdForClient = {};
+
   this.orderForOrderId = {};
   this.orderChainForPrice = {};
   this.baseMinRemainingSize = new BigNumber('10');
@@ -57,9 +67,16 @@ ReferenceExchange.prototype.getClientBalances = function(client) {
     this._getOrDflt(this.balanceBaseForClient, client, this.bigZero),
     this._getOrDflt(this.balanceCntrForClient, client, this.bigZero),
     this._getOrDflt(this.balanceRwrdForClient, client, this.bigZero),
-    this.bigZero, // TODO - approvals
-    this.bigZero
+    this._getOrDflt(this.approvedBaseForClient, client, this.bigZero),
+    this._getOrDflt(this.approvedRwrdForClient, client, this.bigZero),
+    this._getOrDflt(this.ownBaseForClient, client, this.bigZero),
+    this._getOrDflt(this.ownRwrdForClient, client, this.bigZero)
   ];
+};
+
+// annoying special case due to geth/metamask bug
+ReferenceExchange.prototype.getOwnCntrBalance = function(client) {
+  return this._getOrDflt(this.ownCntrForClient, client, this.bigZero);
 };
 
 ReferenceExchange.prototype.depositBaseForTesting = function(client, amountBase) {
@@ -229,7 +246,8 @@ ReferenceExchange.prototype.cancelOrder = function(client, orderId)  {
       orderId: orderId,
       marketOrderEventType: 'Remove',
       price: order.price,
-      amountBase: order.sizeBase.minus(order.executedBase)
+      depthBase: order.sizeBase.minus(order.executedBase),
+      tradeBase: this.bigZero
     });
   }
   this._refundUnmatchedAndFinish(order, 'Done', 'ClientCancel');
@@ -627,7 +645,8 @@ ReferenceExchange.prototype._matchWithTheirs = function(ourOrder, theirOrder)  {
       orderId: theirOrder.orderId,
       marketOrderEventType: 'CompleteFill',
       price: theirOrder.price,
-      amountBase: matchBase
+      depthBase: matchBase,
+      tradeBase: matchBase
     });
   } else {
     this._raiseEvent({
@@ -635,7 +654,8 @@ ReferenceExchange.prototype._matchWithTheirs = function(ourOrder, theirOrder)  {
       orderId: theirOrder.orderId,
       marketOrderEventType: 'PartialFill',
       price: theirOrder.price,
-      amountBase: matchBase
+      depthBase: matchBase,
+      tradeBase: matchBase
     });
   }
 };
@@ -693,6 +713,7 @@ ReferenceExchange.prototype._enterOrder = function(order)  {
     orderId: order.orderId,
     marketOrderEventType: 'Add',
     price: order.price,
-    amountBase: order.sizeBase.minus(order.executedBase)
+    depthBase: order.sizeBase.minus(order.executedBase),
+    tradeBase: this.bigZero
   });
 };

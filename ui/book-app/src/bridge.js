@@ -147,9 +147,20 @@ class Bridge {
   }
 
   // Request callback with client's balances (if available).
-  // Callback fn should take (error, result) where result is as UbiTokTypes.decodeClientBalances().
+  // Callback fn should take (error, result) where result is an object
+  // containing zero or more of the following formatted balances:
+  //   exchangeBase
+  //   exchangeCntr
+  //   exchangeRwrd
+  //   approvedBase
+  //   approvedRwrd
+  //   ownBase
+  //   ownCntr
+  //   ownRwrd
+  // The callback may be invoked more than once with different subsets -
+  // it should merge the results with any balances it already has.
   // Returns nothing useful.
-  getExchangeBalances = (callback) => {
+  getBalances = (callback) => {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
@@ -163,6 +174,18 @@ class Bridge {
     };
     let ourAddress = this._getOurAddress();
     this.bookContract.getClientBalances(ourAddress, wrapperCallback);
+    // We can't use the contract to get our eth balance due to a rather odd geth bug
+    let wrapperCallback2 = (error, result) => {
+      if (error) {
+        return callback(error, undefined);
+      } else {
+        let translatedResult = {
+          ownCntr: UbiTokTypes.decodeCntrAmount(result)
+        }
+        return callback(error, translatedResult);
+      }
+    };
+    this.web3.eth.getBalance(ourAddress, wrapperCallback2);
   }
 
   // Submit a base deposit approval for given friendly base amount.

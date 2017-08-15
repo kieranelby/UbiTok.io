@@ -1,13 +1,13 @@
 {
   "name": "ubi-lib",
-  "version": "1.0.16",
-  "description": "",
-  "scripts": {
-    "test": "./node_modules/.bin/mocha --reporter spec"
-  },
+  "version": "1.0.21",
+  "description": "Javascript libraries for working with the UbiTok exchange",
   "author": "Bonnag Limited",
   "license": "Proprietary",
   "private": true,
+  "scripts": {
+    "test": "./node_modules/.bin/mocha --reporter spec"
+  },
   "dependencies": {
     "bignumber.js": "^4.0.2",
     "uuid": "^3.1.0",

@@ -378,7 +378,9 @@ exports.decodeClientBalances = function (result) {
     exchangeCntr: exports.decodeCntrAmount(result[1]),
     exchangeRwrd: exports.decodeRwrdAmount(result[2]),
     approvedBase: exports.decodeBaseAmount(result[3]),
-    approvedRwrd: exports.decodeRwrdAmount(result[4])
+    approvedRwrd: exports.decodeRwrdAmount(result[4]),
+    ownBase: exports.decodeBaseAmount(result[5]),
+    ownRwrd: exports.decodeRwrdAmount(result[6])
   };
 };
 
@@ -435,6 +437,7 @@ exports.decodeMarketOrderEvent = function(result) {
       marketOrderEventType: exports.decodeMarketOrderEventType(result.args.marketOrderEventType),
       orderId: exports.decodeOrderId(result.args.orderId),
       pricePacked: result.args.price.toNumber(),
-      rawAmountBase: result.args.amountBase
+      rawDepthBase: result.args.depthBase,
+      rawTradeBase: result.args.tradeBase
   };
 };

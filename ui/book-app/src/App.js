@@ -9,7 +9,9 @@ import update from "immutability-helper";
 import moment from "moment";
 
 import Spinner from "react-spinkit";
-import logo from "./ubitok-logo.svg";
+import UbiLogo from "./ubitok-logo.svg";
+import DemoLogo from "./demo-logo.svg";
+import TestLogo from "./test-logo.svg";
 
 import BridgeStatus from "./bridge-status.js";
 import CreateOrder from "./create-order.js";
@@ -33,6 +35,7 @@ class App extends Component {
 
     const bookInfo = UbiBooks.bookInfo[props.bookId];
     const networkInfo = UbiBooks.networkInfo[bookInfo.networkId];
+    bookInfo.liveness = networkInfo.liveness;
     if (networkInfo.liveness === "DEMO") {
       this.bridge = new DemoBridge(bookInfo, networkInfo);
     } else {
@@ -59,6 +62,7 @@ class App extends Component {
       // what are we trading?
       // e.g.
       // symbol: "TEST/ETH",
+      // liveness: "DEMO",
       // base: {
       //   tradableType: "ERC20",
       //   symbol: "TEST",
@@ -86,14 +90,16 @@ class App extends Component {
 
       // how much money do we have where (in display units)?
       // "" = unknown
-      // TODO - add off-exchange balances?
 
       "balances": {
         exchangeBase: "",
         exchangeCntr: "",
         exchangeRwrd: "",
         approvedBase: "",
-        approvedRwrd: ""
+        approvedRwrd: "",
+        ownBase: "",
+        ownCntr: "",
+        ownRwrd: ""
       },
 
       // which payment tab the user is on
@@ -194,9 +200,9 @@ class App extends Component {
       "marketTradesLoaded": false
     };
     this.bridge.subscribeStatus(this.handleStatusUpdate);
-    window.setInterval(this.pollExchangeBalances, 3000);
+    window.setInterval(this.pollBalances, 3000);
     window.setInterval(this.updateClock, 1000);
-    window.setInterval(this.purgeExcessData, 5000);
+    window.setInterval(this.purgeExcessData, 30000);
     window.document.title = "UbiTok.io - " + this.state.pairInfo.symbol;
   }
 
@@ -307,6 +313,7 @@ class App extends Component {
 
   // TODO - move to some sort of helper?
   readPublicData = () => {
+    // hang on, should we wait until walked book? or is it important to subscribe now to avoid missing?
     this.bridge.subscribeFutureMarketEvents(this.handleMarketEvent);
     this.startWalkBook();
     this.bridge.getHistoricMarketEvents(this.handleHistoricMarketEvents);
@@ -361,15 +368,17 @@ class App extends Component {
   updateInternalBookFromEvent = (event) => {
     // [rawDepth, orderCount, blockNumber]
     let entry = this.internalBook.has(event.pricePacked) ? this.internalBook.get(event.pricePacked) : [new BigNumber(0), 0, 0];
+    // hang on, > isn't quite right if we get two "future" events in same block
+    // but >= is wrong if got walked book + future event together
     if (event.blockNumber > entry[2]) {
       if (event.marketOrderEventType === "Add") {
-        entry[0] = entry[0].add(event.rawAmountBase);
+        entry[0] = entry[0].add(event.rawDepthBase);
         entry[1] = entry[1] + 1;
         entry[2] = event.blockNumber;
       } else if ( event.marketOrderEventType === "Remove" ||
                   event.marketOrderEventType === "PartialFill" ||
                   event.marketOrderEventType === "CompleteFill" ) {
-        entry[0] = entry[0].minus(event.rawAmountBase);
+        entry[0] = entry[0].minus(event.rawDepthBase);
         if (event.marketOrderEventType !== "PartialFill") {
           entry[1] = entry[1] - 1;
         }
@@ -389,7 +398,7 @@ class App extends Component {
         eventTimestamp: event.eventTimestamp,
         makerOrderId: event.orderId,
         makerPrice: UbiTokTypes.decodePrice(event.pricePacked),
-        executedBase: this.formatBase(event.rawAmountBase),
+        executedBase: this.formatBase(event.rawTradeBase),
       });
     }
   }
@@ -498,18 +507,19 @@ class App extends Component {
     }
   }
 
-  pollExchangeBalances = () => {
-    this.bridge.getExchangeBalances((error, newExchangeBalances) => {
+  pollBalances = () => {
+    let callback = (error, newExchangeBalanceSubset) => {
       if (error) {
-        console.log(error);
+        // not much we can do, wait for retry
         return;
       }
       this.setState((prevState, props) => {
         return {
-          balances: update(prevState.balances, {$merge: newExchangeBalances})
+          balances: update(prevState.balances, {$merge: newExchangeBalanceSubset})
         };
       });
-    });
+    };
+    this.bridge.getBalances(callback);
   }
 
   handleCreateOrderDirectionSelect = (key) => {
@@ -807,7 +817,13 @@ class App extends Component {
     return (
       <div className="App">
         <div className="App-header">
-          <img src={logo} className="App-logo" alt="UbiTok.io" /> the unstoppable Ethereum token exchange
+          { (this.state.pairInfo.liveness === "DEMO") ? (
+            <img src={DemoLogo} className="App-logo" alt="DEMO" />
+          ) : undefined }
+          { (this.state.pairInfo.liveness === "TEST") ? (
+            <img src={TestLogo} className="App-logo" alt="TEST" />
+          ) : undefined }
+          <img src={UbiLogo} className="App-logo" alt="UbiTok.io" />- the unstoppable Ethereum token exchange
         </div>
         <Grid>
           <Row>
@@ -955,7 +971,8 @@ class App extends Component {
                         <ControlLabel>Step 0</ControlLabel>
                         <HelpBlock>
                           If you have {this.state.pairInfo.base.symbol} tokens in another exchange or account,
-                          you'll first need to withdraw/transfer them to your account: {this.state.bridgeStatus.chosenAccount}
+                          you'll first need to withdraw/transfer them to your account: {this.state.bridgeStatus.chosenAccount}.
+                          Currently it owns {this.state.balances.ownBase} {this.state.pairInfo.base.symbol}.
                         </HelpBlock>
                       </FormGroup>
                       <FormGroup controlId="approval">
@@ -978,6 +995,9 @@ class App extends Component {
                         </InputGroup>
                         <SendingButton bsStyle="primary" onClick={this.handleDepositBaseSetApprovedAmountClick} text="Set Approved Amount" />
                         <FormControl.Feedback />
+                        <HelpBlock>
+                        Note: some tokens won't let you change the approved amount unless you set it to zero first.
+                        </HelpBlock>
                       </FormGroup>
                       <FormGroup controlId="collection">
                         <ControlLabel>Step 2</ControlLabel>
@@ -1024,7 +1044,8 @@ class App extends Component {
                         <ControlLabel>Step 0</ControlLabel>
                         <HelpBlock>
                           If you have {this.state.pairInfo.cntr.symbol} in another exchange or account,
-                          you'll first need to withdraw/transfer them to your account: {this.state.bridgeStatus.chosenAccount}
+                          you'll first need to withdraw/transfer them to your account: {this.state.bridgeStatus.chosenAccount} .
+                          Currently it owns {this.state.balances.ownCntr} {this.state.pairInfo.cntr.symbol}.
                         </HelpBlock>
                       </FormGroup>
                       <FormGroup controlId="transferAmount">

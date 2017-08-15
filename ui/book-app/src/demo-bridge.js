@@ -168,12 +168,24 @@ class DemoBridge {
   }
 
   // Request callback with client's balances (if available).
-  // Callback fn should take (error, result) where result is as UbiTokTypes.decodeClientBalances().
+  // Callback fn should take (error, result) where result is an object
+  // containing zero or more of the following formatted balances:
+  //   exchangeBase
+  //   exchangeCntr
+  //   exchangeRwrd
+  //   approvedBase
+  //   approvedRwrd
+  //   ownBase
+  //   ownCntr
+  //   ownRwrd
+  // The callback may be invoked more than once with different subsets.
   // Returns nothing useful.
-  getExchangeBalances = (callback) => {
+  getBalances = (callback) => {
     this._scheduleRead(() => {
       const rawBalances = this.rx.getClientBalances(this.chosenAccount);
       const fmtBalances = UbiTokTypes.decodeClientBalances(rawBalances);
+      // the off-book eth balance is an oddity
+      fmtBalances.ownCntr = UbiTokTypes.decodeCntrAmount(this.rx.getOwnCntrBalance(this.chosenAccount));
       callback(undefined, fmtBalances);
     });
   }
@@ -336,11 +348,12 @@ class DemoBridge {
       blockNumber: refEvent.blockNumber,
       logIndex: refEvent.logIndex,
       eventRemoved: false,
-      eventTimestamp: new Date(), // TODO - don't like
+      eventTimestamp: new Date(), // TODO - virtualize
       marketOrderEventType: refEvent.marketOrderEventType,
       orderId: refEvent.orderId,
       pricePacked: UbiTokTypes.encodePrice(refEvent.price),
-      rawAmountBase: refEvent.amountBase
+      rawDepthBase: refEvent.depthBase,
+      rawTradeBase: refEvent.tradeBase
     };
     for (let observer of this.futureMarketEventSubscribers) {
       observer(undefined, fmtEvent);
