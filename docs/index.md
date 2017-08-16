@@ -64,10 +64,11 @@ We guarantee to:
 In order to avoid relying on trading fees, we hope to offer value-added products and services that build on top of our core exchange - see roadmap below.
 
 ## What's on the UbiTok.io roadmap?
-- Alpha testnet (play-money) release (Aug 2017);
+- Demo and Testnet (play-money) releases (Aug 2017);
 - Main-net (real-money) release offering small number of pairs, MetaMask/Mist only (Sep 2017);
 - Work in any browser without needing MetaMask or Mist installed (Oct 2017);
 - Javascript APIs for trading on UbiTok.io - e.g. for market making, arbitrage (Nov 2017)
+- Make it easier to trade on the exchange via MyEtherWallet (Nov 2017)
 - Solidity SDK for writing smart contracts that trade on UbiTok.io - e.g. for maintaining a pool of reserves, running ICOs (Dec 2017);
 - Improved user interface and price charts (early 2018);
 - Multi-language web UI (e.g. Simplified Chinese)  (early 2018);
@@ -78,7 +79,7 @@ In order to avoid relying on trading fees, we hope to offer value-added products
 
 Perhaps you have some ideas for smart tokens that can be traded on our exchange, or for autonomous smart contracts that place orders into the exchange - we look forward to seeing what can be done with a fully on-chain trading venue.
 
-## Are you planning a crowd-sale?
+## Are you planning any sort of ICO / crowdsale?
 We are considering using crowd-funding to accelerate our product development (and improve our design and marketing).
 
 We want to make sure we have a working product and a solid business model first though.

@@ -34,7 +34,8 @@ contract BookERC20EthV1 {
     Done,
     NeedsGas,
     Sending, // not used by contract - web only
-    FailedSend // not used by contract - web only
+    FailedSend, // not used by contract - web only
+    FailedTxn, // not used by contract - web only
   }
 
   enum ReasonCode {

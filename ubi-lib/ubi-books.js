@@ -48,7 +48,7 @@ exports.bookInfo = {
       tradableType: "Ether",
       symbol: "ETH",
       decimals: 18,
-      name: "Ether",
+      name: "Demo Ether",
       minInitialSize: "0.001"
     },
     rwrd: {
@@ -60,16 +60,16 @@ exports.bookInfo = {
       abiArray: [],
     }
   },
-  "TEST/ETH" : {
+  "TESTR/ETH" : {
     networkId: "3",
     bookAddress: "0x297ad00cf67aa1dcfc2c952b15502fa9e1910cee",
     bookAbiArray: BookERC20EthV1AbiArray,
-    symbol: "TEST/ETH",
+    symbol: "TESTR/ETH",
     base: {
       tradableType: "ERC20",
-      symbol: "TEST",
+      symbol: "TESTR",
       decimals: 18,
-      name: "Test Token",
+      name: "Test Token (Ropsten)",
       address: "0x678c4cf3f4a26d607d0a0032d72fdc3b1e3f71f4",
       abiArray: niceERC20TokenAbiArray,
       minInitialSize: "0.01"
@@ -78,14 +78,14 @@ exports.bookInfo = {
       tradableType: "Ether",
       symbol: "ETH",
       decimals: 18,
-      name: "Ether",
+      name: "Test Ether",
       minInitialSize: "0.001"
     },
     rwrd: {
       tradableType: "ERC20",
       symbol: "UBI",
       decimals: 18,
-      name: "UbiTok.io Reward Token",
+      name: "Test UbiTok.io Reward Token",
       address: "0x5cfad634865157a5a988d743e6fcb4514e655460",
       abiArray: niceERC20TokenAbiArray,
     }

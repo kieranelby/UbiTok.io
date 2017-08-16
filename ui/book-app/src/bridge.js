@@ -195,12 +195,15 @@ class Bridge {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
+    // use fixed amount so can detect failures by max consumption
+    // TODO - different tokens may require different amounts ...
+    let gasAmount = 250000;
     this.baseToken.approve.sendTransaction(
       this.bookContract.address,
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
       UbiTokTypes.encodeBaseAmount(fmtAmount).valueOf(),
-      { from: this._getOurAddress() },
-      (new TransactionWatcher(this.web3, callback)).handleTxn
+      { from: this._getOurAddress(), gas: gasAmount },
+      (new TransactionWatcher(this.web3, callback, gasAmount)).handleTxn
     );
   }
 
@@ -211,9 +214,12 @@ class Bridge {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
+    // use fixed amount so can detect failures by max consumption
+    // TODO - different tokens may require different amounts ...
+    let gasAmount = 250000;
     this.bookContract.transferFromBase.sendTransaction(
-      { from: this._getOurAddress() },
-      (new TransactionWatcher(this.web3, callback)).handleTxn
+      { from: this._getOurAddress(), gas: gasAmount },
+      (new TransactionWatcher(this.web3, callback, gasAmount)).handleTxn
     );
   }
 
@@ -224,11 +230,14 @@ class Bridge {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
+    // use fixed amount so can detect failures by max consumption
+    // TODO - different tokens may require different amounts ...
+    let gasAmount = 250000;
     this.bookContract.transferBase.sendTransaction(
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
       UbiTokTypes.encodeBaseAmount(fmtAmount).valueOf(),
-      { from: this._getOurAddress() },
-      (new TransactionWatcher(this.web3, callback)).handleTxn
+      { from: this._getOurAddress(), gas: gasAmount },
+      (new TransactionWatcher(this.web3, callback, gasAmount)).handleTxn
     );
   }
 
@@ -239,12 +248,15 @@ class Bridge {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
+    // use fixed amount so can detect failures by max consumption
+    let gasAmount = 150000;
     this.bookContract.depositCntr.sendTransaction(
       {
         from: this._getOurAddress(),
+        gas: gasAmount,
         value: UbiTokTypes.encodeCntrAmount(fmtAmount)
       },
-      (new TransactionWatcher(this.web3, callback)).handleTxn
+      (new TransactionWatcher(this.web3, callback, gasAmount)).handleTxn
     );
   }
 
@@ -255,11 +267,13 @@ class Bridge {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
+    // use fixed amount so can detect failures by max consumption
+    let gasAmount = 150000;
     this.bookContract.withdrawCntr.sendTransaction(
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
       UbiTokTypes.encodeCntrAmount(fmtAmount).valueOf(),
-      { from: this._getOurAddress() },
-      (new TransactionWatcher(this.web3, callback)).handleTxn
+      { from: this._getOurAddress(), gas: gasAmount },
+      (new TransactionWatcher(this.web3, callback, gasAmount)).handleTxn
     );
   }
   
@@ -298,20 +312,12 @@ class Bridge {
   // Submit a request to create an order.
   // Callback fn should take (error, event) - see TransactionWatcher.
   // Returns nothing useful.
-  submitCreateOrder = (fmtOrderId, fmtPrice, fmtSizeBase, fmtTerms, callback) => {
+  submitCreateOrder = (fmtOrderId, fmtPrice, fmtSizeBase, fmtTerms, maxMatches, callback) => {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
-    // TODO - come up with "clever" way of choosing maxMatches + gas
-    var maxMatches;
-    var gasAmount;
-    if (fmtTerms === "MakerOnly") {
-      maxMatches = 0;
-      gasAmount = 300000;
-    } else {
-      maxMatches = 3;
-      gasAmount = 550000;
-    }
+    // probably too pessimistic, can reduce once analysed worst-case properly
+    let gasAmount = 300000 + 100000 * maxMatches;
     this.bookContract.createOrder.sendTransaction(
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
       UbiTokTypes.encodeOrderId(fmtOrderId).valueOf(),
@@ -320,20 +326,19 @@ class Bridge {
       UbiTokTypes.encodeTerms(fmtTerms).valueOf(),
       maxMatches,
       { from: this._getOurAddress(), gas: gasAmount },
-      (new TransactionWatcher(this.web3, callback)).handleTxn
+      (new TransactionWatcher(this.web3, callback, gasAmount)).handleTxn
     );
   }
 
   // Submit a request to continue an order.
   // Callback fn should take (error, event) - see TransactionWatcher.
   // Returns nothing useful.
-  submitContinueOrder = (fmtOrderId, callback) => {
+  submitContinueOrder = (fmtOrderId, maxMatches, callback) => {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
-    // TODO - come up with "clever" way of choosing maxMatches + gas
-    let maxMatches = 3;
-    let gasAmount = 550000;
+    // probably too pessimistic, can reduce once analysed worst-case properly
+    let gasAmount = 150000 + 100000 * maxMatches;
     this.bookContract.continueOrder.sendTransaction(
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
       UbiTokTypes.encodeOrderId(fmtOrderId).valueOf(),
@@ -350,13 +355,15 @@ class Bridge {
     if (!this.checkCanMakeAccountCalls(callback)) {
       return;
     }
-    // can't rely on estimate 'cos it can change based on other orders being placed ...
-    var gasAmount = 150000;
+    // specify fixed amount since:
+    // a) can't rely on estimate 'cos it can change based on other orders being placed
+    // b) it is useful for detecting failed transactions (those that used all the gas)
+    let gasAmount = 150000;
     this.bookContract.cancelOrder.sendTransaction(
       // TODO - valueOf is just to work around an annoying recent web3 bug ...
       UbiTokTypes.encodeOrderId(fmtOrderId).valueOf(),
       { from: this._getOurAddress(), gas: gasAmount },
-      (new TransactionWatcher(this.web3, callback)).handleTxn
+      (new TransactionWatcher(this.web3, callback, gasAmount)).handleTxn
     );
   }
 
@@ -413,13 +420,26 @@ class Bridge {
 
 }
 
-// TODO - explain
-// TODO - find good way of detecting and reporting failed transactions
+// After submitting a txn (e.g. create/cancel order, make payment),
+// we need some way of knowing if/when it made it into the blockchain.
+// Use by creating a TransactionWatcher and passing its handleTxn method
+// as the callback to a web3 contractMethod.sendTransaction call.
+// It will in invoke your callback with:
+//  1. {event: "GotTxnHash", txnHash: "the hash"}
+// Followed by either:
+//  2a. {event: "Mined"}
+// or:
+//  2b. {event: "FailedTxn"}
+// But it can only return FailedTxn if you give it a "optionalGasFail"
+// value - if the txn uses that much gas (or more) it assumes it has failed.
+// TODO - is there really no better way to detect a bad transaction?
+//
 class TransactionWatcher {
 
-  constructor(web3, callback) {
+  constructor(web3, callback, optionalGasFail) {
     this.web3 = web3;
     this.callback = callback;
+    this.optionalGasFail = optionalGasFail;
     this.txnHash = undefined;
   }
   
@@ -442,6 +462,12 @@ class TransactionWatcher {
       window.setTimeout(this._pollTxn, 3000);
       return;
     } else {
+      if (this.optionalGasFail) {
+        if (result.gasUsed >= this.optionalGasFail) {
+          this.callback(undefined, {event: "FailedTxn"});
+          return;
+        }
+      }
       this.callback(undefined, {event: "Mined"});
     }
   }

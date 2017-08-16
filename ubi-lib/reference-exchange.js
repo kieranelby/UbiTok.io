@@ -635,17 +635,15 @@ ReferenceExchange.prototype._matchWithTheirs = function(ourOrder, theirOrder)  {
     // they have bought Cntr (using the base they already paid when creating the order)
      this._creditFundsCntr(theirOrder.client, matchCntr);
   }
-  // TODO - dust prevention (need to refund it tho)
-  if (theirOrder.executedBase.eq(theirOrder.sizeBase)) {
-    theirOrder.status = 'Done';
-    theirOrder.reasonCode = 'None';
-    // TODO - hang on, the event does not account for any refunded unmatched dust
+  let theirStillRemainingBase = theirOrder.sizeBase.minus(theirOrder.executedBase);
+  if (theirStillRemainingBase.lt(this.baseMinRemainingSize)) {
+    this._refundUnmatchedAndFinish(theirOrder, 'Done', 'None');
     this._raiseEvent({
       eventType: 'MarketOrderEvent',
       orderId: theirOrder.orderId,
       marketOrderEventType: 'CompleteFill',
       price: theirOrder.price,
-      depthBase: matchBase,
+      depthBase: matchBase.add(theirStillRemainingBase),
       tradeBase: matchBase
     });
   } else {

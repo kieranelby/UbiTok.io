@@ -267,17 +267,8 @@ class DemoBridge {
   // Submit a request to create an order.
   // Callback fn should take (error, event) - see TransactionWatcher.
   // Returns nothing useful.
-  submitCreateOrder = (fmtOrderId, fmtPrice, fmtSizeBase, fmtTerms, callback) => {
-    // TODO - come up with "clever" way of choosing maxMatches + gas
-    var maxMatches;
-    var gasAmount;
-    if (fmtTerms === "MakerOnly") {
-      maxMatches = 0;
-      gasAmount = 300000;
-    } else {
-      maxMatches = 3;
-      gasAmount = 550000;
-    }
+  submitCreateOrder = (fmtOrderId, fmtPrice, fmtSizeBase, fmtTerms, maxMatches, callback) => {
+    let gasAmount = 300000 + 100000 * maxMatches;
     this._queueTxn(() => {
       this.rx.createOrder(
         this.chosenAccount,
@@ -293,10 +284,8 @@ class DemoBridge {
   // Submit a request to continue an order.
   // Callback fn should take (error, event) - see TransactionWatcher.
   // Returns nothing useful.
-  submitContinueOrder = (fmtOrderId, callback) => {
-    // TODO - come up with "clever" way of choosing maxMatches + gas
-    let maxMatches = 3;
-    let gasAmount = 550000;
+  submitContinueOrder = (fmtOrderId, maxMatches, callback) => {
+    let gasAmount = 150000 + 100000 * maxMatches;
     this._queueTxn(() => {
       this.rx.continueOrder(
         this.chosenAccount,

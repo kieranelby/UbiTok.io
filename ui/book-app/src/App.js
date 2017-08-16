@@ -23,6 +23,7 @@ import OrderDetails from "./order-details.js";
 import "./App.css";
 
 import Bridge from "./bridge.js";
+import BookBuilder from './book-builder.js';
 import DemoBridge from "./demo-bridge.js";
 import UbiTokTypes from "ubi-lib/ubi-tok-types.js";
 import UbiBooks from "ubi-lib/ubi-books.js";
@@ -43,13 +44,8 @@ class App extends Component {
     }
     this.lastBridgeStatus = this.bridge.getInitialStatus();
 
-    // TODO - move internal book to separate class
-    // pricePacked -> [rawDepth, orderCount, blockNumber]
-    this.internalBook = new Map();
-    this.internalBookWalked = false;
-
-    this.marketEventQueue = [];
-
+    this.bookBuilder = new BookBuilder(this.bridge, this.handleBookUpdate);
+    
     this.state = {
 
       // current time (helps testability vs. straight new Date())
@@ -311,16 +307,33 @@ class App extends Component {
     });
   }
 
-  // TODO - move to some sort of helper?
   readPublicData = () => {
-    // hang on, should we wait until walked book? or is it important to subscribe now to avoid missing?
     this.bridge.subscribeFutureMarketEvents(this.handleMarketEvent);
-    this.startWalkBook();
     this.bridge.getHistoricMarketEvents(this.handleHistoricMarketEvents);
+    this.bookBuilder.start();
   }
 
   readAccountData = () => {
     this.bridge.walkMyOrders(undefined, this.handleWalkMyOrdersCallback);
+  }
+
+  handleBookUpdate = (error, event) => {
+    if (error) {
+      this.panic(error);
+      return;
+    }
+    if (this.bookBuilder.isComplete) {
+      let niceBook = this.bookBuilder.getNiceBook();
+      this.setState((prevState, props) => {
+        return {
+          book: update(prevState.book, {
+            isComplete: {$set: true},
+            bids: {$set: niceBook[0]},
+            asks: {$set: niceBook[1]},
+          })
+        };
+      });
+    }
   }
 
   handleHistoricMarketEvents = (error, events) => {
@@ -343,49 +356,12 @@ class App extends Component {
       this.panic(error);
       return;
     }
-    console.log("handleMarketEvent", event);
-    this.marketEventQueue.push(event);
-    this.consumeQueuedMarketEvents();
-  }
-
-  consumeQueuedMarketEvents = () => {
-    if (!this.internalBookWalked) {
-      return;
+    if (this.isInMyOrders(event.orderId)) {
+      this.bridge.getOrderState(event.orderId, (error, result) => {
+        this.updateMyOrder(event.orderId, result);
+      });
     }
-    for (let event of this.marketEventQueue) {
-      if (this.isInMyOrders(event.orderId)) {
-        this.bridge.getOrderState(event.orderId, (error, result) => {
-          this.updateMyOrder(event.orderId, result);
-        });
-      }
-      this.updateInternalBookFromEvent(event);
-      this.addMarketTradeFromEvent(event);
-    }
-    this.marketEventQueue = [];
-    this.updatePublicBook();
-  }
-
-  updateInternalBookFromEvent = (event) => {
-    // [rawDepth, orderCount, blockNumber]
-    let entry = this.internalBook.has(event.pricePacked) ? this.internalBook.get(event.pricePacked) : [new BigNumber(0), 0, 0];
-    // hang on, > isn't quite right if we get two "future" events in same block
-    // but >= is wrong if got walked book + future event together
-    if (event.blockNumber > entry[2]) {
-      if (event.marketOrderEventType === "Add") {
-        entry[0] = entry[0].add(event.rawDepthBase);
-        entry[1] = entry[1] + 1;
-        entry[2] = event.blockNumber;
-      } else if ( event.marketOrderEventType === "Remove" ||
-                  event.marketOrderEventType === "PartialFill" ||
-                  event.marketOrderEventType === "CompleteFill" ) {
-        entry[0] = entry[0].minus(event.rawDepthBase);
-        if (event.marketOrderEventType !== "PartialFill") {
-          entry[1] = entry[1] - 1;
-        }
-        entry[2] = event.blockNumber;
-      }
-    }
-    this.internalBook.set(event.pricePacked, entry);
+    this.addMarketTradeFromEvent(event);
   }
 
   addMarketTradeFromEvent = (event) => {
@@ -413,83 +389,6 @@ class App extends Component {
     });
   }
   
-  startWalkBook = () => {
-    console.log("startWalkBook ...");
-    this.internalBook.clear();
-    this.bridge.walkBook(1, this.handleWalkBook);
-  }
-
-  handleWalkBook = (error, result) => {
-    console.log("handleWalkBook", error, result);
-    if (error) {
-      this.panic(error);
-      return;
-    }
-    var pricePacked = result[0].toNumber();
-    var depth = result[1];
-    var orderCount = result[2].toNumber();
-    var blockNumber = result[3].toNumber();
-    var nextPricePacked;
-    var done = false;
-    if (!depth.isZero()) {
-      this.internalBook.set(pricePacked, [depth, orderCount, blockNumber]);
-      if (pricePacked === UbiTokTypes.minSellPricePacked) {
-        done = true;
-      } else {
-        nextPricePacked = pricePacked + 1;
-      }
-    } else {
-      if (pricePacked <= UbiTokTypes.minBuyPricePacked) {
-        nextPricePacked = UbiTokTypes.minSellPricePacked;
-      } else {
-        done = true;
-      }
-    }
-    if (!done) {
-      this.bridge.walkBook(nextPricePacked, this.handleWalkBook);
-    } else {
-      this.endWalkBook();
-    }
-  }
-
-  updatePublicBook = () => {
-    let bids = [];
-    let asks = [];
-    let sortedEntries = Array.from(this.internalBook.entries()).sort((a,b) => a[0]-b[0]);
-    for (let entry of sortedEntries) {
-      let pricePacked = entry[0];
-      let rawDepth = entry[1][0];
-      let orderCount = entry[1][1];
-      if (rawDepth.comparedTo(0) <= 0) {
-        continue;
-      }
-      let friendlyDepth = this.formatBase(rawDepth);
-      let price = UbiTokTypes.decodePrice(pricePacked);
-      if (pricePacked <= UbiTokTypes.minBuyPricePacked) {
-        bids.push([price, friendlyDepth, orderCount]);
-      } else {
-        asks.push([price, friendlyDepth, orderCount]);
-      }
-    }
-    asks.reverse();
-    this.setState((prevState, props) => {
-      return {
-        book: update(prevState.book, {
-          isComplete: {$set: true},
-          bids: {$set: bids},
-          asks: {$set: asks},
-        })
-      };
-    });
-  }
-
-  endWalkBook = () => {
-    console.log("book", this.internalBook);
-    this.internalBookWalked = true;
-    this.updatePublicBook();
-    this.consumeQueuedMarketEvents();
-  }
-
   handleWalkMyOrdersCallback = (error, result) => {
     if (error) {
       return this.panic(error);
@@ -534,9 +433,25 @@ class App extends Component {
     let callback = (error, result) => {
       this.handlePlaceOrderCallback(orderId, error, result);
     };
-    this.bridge.submitCreateOrder(orderId, price, sizeBase, terms, callback);
+    let maxMatches = this.chooseMaxMatches(price, sizeBase, terms);
+    this.bridge.submitCreateOrder(orderId, price, sizeBase, terms, maxMatches, callback);
     var newOrder = this.fillInSendingOrder(orderId, price, sizeBase, terms);
     this.createMyOrder(newOrder);
+  }
+
+  chooseMaxMatches = (price, sizeBase, terms) => {
+    if (terms === 'MakerOnly') {
+      return 0;
+    }
+    let estimatedMatches = this.bookBuilder.estimateMatches(price, sizeBase);
+    // perhaps we should allow the user some control over this?
+    let maxMatches = 2 + estimatedMatches;
+    if (maxMatches < 3) {
+      maxMatches = 3;
+    } else if (maxMatches > 15) {
+      maxMatches = 15;
+    }
+    return maxMatches;
   }
 
   isInMyOrders = (orderId) => {
@@ -600,7 +515,8 @@ class App extends Component {
     } else {
       if (result.event === "GotTxnHash") {
         this.updateMyOrder(orderId, {txnHash: result.txnHash});
-      } else if (result.event === "Mined") {
+      } else {
+        // TODO - handle FailedTxn (will appear as Unknown otherwise)
         this.refreshOrder(orderId);
       }
     }
@@ -615,7 +531,8 @@ class App extends Component {
     } else {
       if (result.event === "GotTxnHash") {
         // TODO - suppose should try to convey the txn hash for cancel/continue somehow
-      } else if (result.event === "Mined") {
+      } else {
+        // TODO - handle FailedTxn
         this.updateMyOrder(orderId, { modifyInProgress: undefined });
         this.refreshOrder(orderId);
       }
@@ -651,8 +568,10 @@ class App extends Component {
     let callback = (error, result) => {
       this.handleModifyOrderCallback(orderId, error, result);
     };
+    let order = this.state.myOrders[orderId];
     this.updateMyOrder(orderId, {modifyInProgress: "Continuing"});
-    this.bridge.submitContinueOrder(orderId, callback);
+    let maxMatches = this.chooseMaxMatches(order.price, order.sizeBase, order.terms);
+    this.bridge.submitContinueOrder(orderId, maxMatches, callback);
   }
 
   handleClickHideOrder = (orderId) => {
@@ -751,6 +670,8 @@ class App extends Component {
         this.updatePaymentEntry(pmtId, {txnHash: result.txnHash});
       } else if (result.event === "Mined") {
         this.updatePaymentEntry(pmtId, {pmtStatus: "Mined"});
+      } else if (result.event === "FailedTxn") {
+        this.updatePaymentEntry(pmtId, {pmtStatus: "FailedTxn"});
       }
     }
   }
@@ -935,7 +856,10 @@ class App extends Component {
                     <tr key={entry.pmtId}>
                       <td>
                         { (entry.pmtStatus === "FailedSend") ? (
-                          <Glyphicon glyph="warning-sign" title="failed to send payment" />
+                          <Glyphicon glyph="exclamation-sign" title="failed to send payment" />
+                        ) : null }
+                        { (entry.pmtStatus === "FailedTxn") ? (
+                          <Glyphicon glyph="exclamation-sign" title="payment transaction failed" />
                         ) : null }
                         <EthTxnLink txnHash={entry.txnHash} networkName={this.state.bridgeStatus.chosenSupportedNetworkName} />
                         {entry.action}

@@ -24,7 +24,8 @@ var enumStatus = [
   'Done',
   'NeedsGas',
   'Sending', // web3 only
-  'FailedSend' // web3 only
+  'FailedSend', // web3 only
+  'FailedTxn' // web3 only
 ];
 
 var enumReasonCode = [
@@ -115,6 +116,7 @@ exports.cntrDecimals = 18;
 exports.rwrdDecimals = 18;
 
 exports.minimumPriceExponent = -5;
+exports.invalidPricePacked = 0;
 exports.maxBuyPricePacked = 1;
 exports.minBuyPricePacked = 10800;
 exports.minSellPricePacked = 10801;
@@ -283,6 +285,16 @@ exports.splitFriendlyPrice = function(price)  {
     return errorAndResult[1];
   }
 };
+
+exports.oppositeEncodedPrice = function(encodedPrice) {
+  if (encodedPrice < exports.maxBuyPricePacked || encodedPrice > exports.maxSellPricePacked) {
+    return exports.invalidPricePacked;
+  } else if (encodedPrice <= exports.minBuyPricePacked) {
+    return exports.maxSellPricePacked - (encodedPrice - exports.maxBuyPricePacked);
+  } else {
+    return exports.maxBuyPricePacked + (exports.maxSellPricePacked - encodedPrice);
+  }
+}
 
 exports.decodeAmount = function(amountWei, decimals) {
   return new BigNumber(amountWei).div('1e' + decimals).toFixed(null);
