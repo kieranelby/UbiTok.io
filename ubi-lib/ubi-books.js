@@ -20,6 +20,11 @@ exports.networkInfo = {
     name: "Ropsten Test Network",
     liveness: "TEST"
   },
+  "42": {
+    networkId: "42",
+    name: "Kovan Test Network",
+    liveness: "TEST"
+  },
   "1": {
     networkId: "1",
     name: "Main Network",
@@ -78,7 +83,7 @@ exports.bookInfo = {
       tradableType: "Ether",
       symbol: "ETH",
       decimals: 18,
-      name: "Test Ether",
+      name: "Test Ether (Ropsten)",
       minInitialSize: "0.001"
     },
     rwrd: {
