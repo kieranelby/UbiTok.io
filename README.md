@@ -1,4 +1,4 @@
-# UbiTok.io
-an unstoppable exchange for trading Ethereum tokens
+# [UbiTok.io](https://ubitok.io/)
+the unstoppable exchange for trading Ethereum tokens
 
-See [UbiTok.io](https://ubitok.io/) for details.
+This repo has been moved to [bonnag/ubitok.io](https://github.com/bonnag/ubitok.io).
